@@ -18,6 +18,7 @@ class VNCHandler(WebSocketHandler):
     """
 
     def __init__(self, transport, password=""):
+        WebSocketHandler.__init__(self, transport)
         self.password = password
 
     def connectionMade(self):
