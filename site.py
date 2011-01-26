@@ -1,23 +1,36 @@
 from functools import partial
 
 from twisted.web.resource import Resource
+from twisted.protocols.policies import ProtocolWrapper
 from twisted.python import log
 
 from vncap.protocol import VNCServerAuthenticator
 from vncap.websocket import WebSocketSite, WebSocketHandler
 
-class DummyTransport(object):
-    buf = ""
-    disconnecting = False
+class DummyFactory(object):
+    """
+    A shim to fool ProtocolWrapper.
 
-    def __init__(self, wrapped):
-        self._wrapped_transport = wrapped
+    We don't actually care about the wrapper factory functionality, so.
+    """
+
+    def registerProtocol(self, protocol):
+        pass
+
+    def unregisterProtocol(self, protocol):
+        pass
+
+class Base64Transport(ProtocolWrapper):
+
+    def dataReceived(self, data):
+        ProtocolWrapper.dataReceived(self, data.decode("base64"))
 
     def write(self, data):
-        self.buf += data
+        ProtocolWrapper.write(self, data.encode("base64"))
 
-    def loseConnection(self):
-        self._wrapped_transport.loseConnection()
+    def writeSequence(self, data):
+        ProtocolWrapper.writeSequence(self,
+            [i.encode("base64") for i in data])
 
 class VNCHandler(WebSocketHandler):
     """
@@ -29,22 +42,15 @@ class VNCHandler(WebSocketHandler):
 
     def __init__(self, transport, password=""):
         WebSocketHandler.__init__(self, transport)
-        self.password = password
-        self.dummy = DummyTransport(transport)
+        self.wrapped = Base64Transport(DummyFactory(),
+            VNCServerAuthenticator(password))
+        self.transport = transport
 
     def connectionMade(self):
-        log.msg("Handling request")
-        self.protocol = VNCServerAuthenticator(self.password)
-        self.protocol.makeConnection(self.dummy)
-        self.send_framed_data()
+        self.wrapped.makeConnection(self.transport)
 
     def frameReceived(self, data):
-        self.protocol.dataReceived(data.decode("base64"))
-        self.send_framed_data()
-
-    def send_framed_data(self):
-        self.transport.write(self.dummy.buf.encode("base64"))
-        self.dummy.buf = ""
+        self.wrapped.dataReceived(data)
 
 class VNCSite(WebSocketSite):
 
