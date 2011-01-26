@@ -8,6 +8,7 @@ from vncap.websocket import WebSocketSite, WebSocketHandler
 
 class DummyTransport(object):
     buf = ""
+    disconnecting = False
 
     def __init__(self, wrapped):
         self._wrapped_transport = wrapped
@@ -34,8 +35,7 @@ class VNCHandler(WebSocketHandler):
     def connectionMade(self):
         log.msg("Handling request")
         self.protocol = VNCServerAuthenticator(self.password)
-        self.protocol.transport = self.dummy
-        self.protocol.connectionMade()
+        self.protocol.makeConnection(self.dummy)
         self.send_framed_data()
 
     def frameReceived(self, data):
