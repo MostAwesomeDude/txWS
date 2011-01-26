@@ -9,8 +9,14 @@ from vncap.websocket import WebSocketSite, WebSocketHandler
 class DummyTransport(object):
     buf = ""
 
+    def __init__(self, wrapped):
+        self._wrapped_transport = wrapped
+
     def write(self, data):
         self.buf += data
+
+    def loseConnection(self):
+        self._wrapped_transport.loseConnection()
 
 class VNCHandler(WebSocketHandler):
     """
@@ -23,11 +29,12 @@ class VNCHandler(WebSocketHandler):
     def __init__(self, transport, password=""):
         WebSocketHandler.__init__(self, transport)
         self.password = password
+        self.dummy = DummyTransport(transport)
 
     def connectionMade(self):
         log.msg("Handling request")
         self.protocol = VNCServerAuthenticator(self.password)
-        self.protocol.transport = DummyTransport()
+        self.protocol.transport = self.dummy
         self.protocol.connectionMade()
         self.send_framed_data()
 
@@ -36,8 +43,8 @@ class VNCHandler(WebSocketHandler):
         self.send_framed_data()
 
     def send_framed_data(self):
-        self.transport.write(self.protocol.transport.buf.encode("base64"))
-        self.protocol.transport.buf = ""
+        self.transport.write(self.dummy.buf.encode("base64"))
+        self.dummy.buf = ""
 
 class VNCSite(WebSocketSite):
 
