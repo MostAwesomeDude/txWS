@@ -15,6 +15,9 @@ class DummyTransport(object):
 class VNCHandler(WebSocketHandler):
     """
     A handler that pretends the other side of the connection is VNC over WS.
+
+    Specifically, the other side is probably NoVNC, which would like us to
+    base64-encode our data.
     """
 
     def __init__(self, transport, password=""):
@@ -26,12 +29,14 @@ class VNCHandler(WebSocketHandler):
         self.protocol = VNCServerAuthenticator(self.password)
         self.protocol.transport = DummyTransport()
         self.protocol.connectionMade()
-        self.transport.write(self.protocol.transport.buf)
-        self.protocol.transport.buf = ""
+        self.send_framed_data()
 
     def frameReceived(self, data):
-        self.protocol.dataReceived(self, data)
-        self.transport.write(self.protocol.transport.buf)
+        self.protocol.dataReceived(data.decode("base64"))
+        self.send_framed_data()
+
+    def send_framed_data(self):
+        self.transport.write(self.protocol.transport.buf.encode("base64"))
         self.protocol.transport.buf = ""
 
 class VNCSite(WebSocketSite):
