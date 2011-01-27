@@ -456,6 +456,19 @@ class WebSocketFrameDecoderTestCase(TestCase):
         self.assertFalse(self.channel.transport.disconnected)
 
 
+    def test_pauseProducing(self):
+        """
+        pauseProducing() keeps received frames from being pushed to the
+        handler.
+        """
+
+        self.decoder.pauseProducing()
+        self.decoder.dataReceived("\x00frame\xff")
+        self.assertEquals(self.decoder.handler.frames, [])
+        self.decoder.resumeProducing()
+        self.assertEquals(self.decoder.handler.frames, ["frame"])
+
+
 
 class WebSocketHandlerTestCase(TestCase):
     """

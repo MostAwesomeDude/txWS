@@ -371,6 +371,22 @@ class WebSocketTransport(object):
         del self._request
         del self._handler
 
+    def pauseProducing(self):
+        """
+        Pause frame production.
+        """
+
+        # XXX I am so sorry for this.
+        self._request.channel._transferDecoder.pauseProducing()
+
+    def resumeProducing(self):
+        """
+        Resume frame production.
+        """
+
+        # XXX I am so sorry for this.
+        self._request.channel._transferDecoder.resumeProducing()
+
 class WebSocketHandler(object):
     """
     Base class for handling WebSocket connections. It mainly provides a
@@ -438,13 +454,14 @@ class WebSocketFrameDecoder(object):
     """
 
     MAX_LENGTH = 16384
-
+    paused = False
 
     def __init__(self, request, handler):
         self.request = request
         self.handler = handler
         self._data = []
         self._currentFrameLength = 0
+        self._queued_frames = []
 
     def dataReceived(self, data):
         """
@@ -468,7 +485,7 @@ class WebSocketFrameDecoder(object):
                 if frame[0] != "\x00":
                     self.request.transport.loseConnection()
                     break
-                self.handler.frameReceived(frame[1:])
+                self._queued_frames.append(frame[1:])
                 data = data[endIndex + 1:]
                 if not data:
                     break
@@ -483,6 +500,31 @@ class WebSocketFrameDecoder(object):
                     self._data.append(data)
                 break
 
+        if not self.paused:
+            for frame in self._queued_frames:
+                self.handler.frameReceived(frame)
+            self._queued_frames = []
+
+    def pauseProducing(self):
+        """
+        Stop producing frames.
+        """
+
+        self.paused = True
+
+    def resumeProducing(self):
+        """
+        Start producing frames again.
+
+        Since I am a push producer, I will push all of my queued frames to my
+        handler when this method is called.
+        """
+
+        self.paused = False
+
+        for frame in self._queued_frames:
+            self.handler.frameReceived(frame)
+        self._queued_frames = []
 
 
 __all__ = ["WebSocketHandler", "WebSocketSite"]
