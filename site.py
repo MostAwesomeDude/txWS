@@ -4,7 +4,7 @@ from twisted.web.resource import Resource
 from twisted.protocols.policies import ProtocolWrapper
 from twisted.python import log
 
-from vncap.protocol import VNCServerAuthenticator
+from vncap.protocol import make_server_and_client
 from vncap.websocket import WebSocketSite, WebSocketHandler
 
 class DummyFactory(object):
@@ -40,10 +40,10 @@ class VNCHandler(WebSocketHandler):
     base64-encode our data.
     """
 
-    def __init__(self, transport, password=""):
+    def __init__(self, transport, host="", port=0, password=""):
         WebSocketHandler.__init__(self, transport)
-        self.wrapped = Base64Transport(DummyFactory(),
-            VNCServerAuthenticator(password))
+        server = make_server_and_client(host, port, password)
+        self.wrapped = Base64Transport(DummyFactory(), server)
         self.transport = transport
 
     def connectionMade(self):
@@ -54,8 +54,8 @@ class VNCHandler(WebSocketHandler):
 
 class VNCSite(WebSocketSite):
 
-    def __init__(self, password):
-        handler = partial(VNCHandler, password=password)
+    def __init__(self, host, port, password):
+        handler = partial(VNCHandler, host=host, port=port, password=password)
         resource = Resource()
         WebSocketSite.__init__(self, resource)
         self.addHandler("/", handler)
