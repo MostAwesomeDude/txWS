@@ -482,7 +482,7 @@ class WebSocketFrameDecoder(object):
                 self._currentFrameLength = 0
                 frame = "".join(self._data) + data[:endIndex]
                 self._data[:] = []
-                if frame[0] != "\x00":
+                if not frame or frame[0] != "\x00":
                     self.request.transport.loseConnection()
                     break
                 self._queued_frames.append(frame[1:])
