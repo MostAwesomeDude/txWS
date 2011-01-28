@@ -1,3 +1,4 @@
+from base64 import b64encode, b64decode
 from functools import partial
 
 from twisted.web.resource import Resource
@@ -23,14 +24,13 @@ class DummyFactory(object):
 class Base64Transport(ProtocolWrapper):
 
     def dataReceived(self, data):
-        ProtocolWrapper.dataReceived(self, data.decode("base64"))
+        ProtocolWrapper.dataReceived(self, b64decode(data))
 
     def write(self, data):
-        ProtocolWrapper.write(self, data.encode("base64"))
+        ProtocolWrapper.write(self, b64encode(data))
 
     def writeSequence(self, data):
-        ProtocolWrapper.writeSequence(self,
-            [i.encode("base64") for i in data])
+        ProtocolWrapper.writeSequence(self, [b64encode(data) for i in data])
 
 class VNCHandler(WebSocketHandler):
     """
