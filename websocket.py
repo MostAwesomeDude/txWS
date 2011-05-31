@@ -128,6 +128,12 @@ class WebSocketRequest(Request):
             """ Receive nonce value from request body, and calculate repsonse. """
             protocolHeaders = self.requestHeaders.getRawHeaders(
                 "WebSocket-Protocol", [])
+
+            # Some browsers think they're hot stuff, and use
+            # Sec-WebSocket-Protocol instead. Let's check for them as well.
+            if not protocolHeaders:
+                protocolHeaders = self.requestHeaders.getRawHeaders(
+                    "Sec-WebSocket-Protocol", [])
             if len(protocolHeaders) not in (0,  1):
                 return finish()
             if protocolHeaders:
@@ -272,13 +278,16 @@ class WebSocketSite(Site):
         list, the connection is closed.
     @type supportedProtocols: C{list}
     """
+
     requestFactory = WebSocketRequest
+    supportedProtocols = ["base64"]
 
     def __init__(self, resource, logPath=None, timeout=60*60*12,
                  supportedProtocols=None):
         Site.__init__(self, resource, logPath, timeout)
         self.handlers = {}
-        self.supportedProtocols = supportedProtocols or []
+        if supportedProtocols:
+            self.supportedProtocols = supportedProtocols
 
     def addHandler(self, name, handlerFactory):
         """
@@ -528,4 +537,3 @@ class WebSocketFrameDecoder(object):
 
 
 __all__ = ["WebSocketHandler", "WebSocketSite"]
-
