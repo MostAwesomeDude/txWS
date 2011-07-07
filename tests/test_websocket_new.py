@@ -73,3 +73,12 @@ class TestWebSocketProtocolFrames(unittest.TestCase):
         self.proto.parse_frames()
 
         self.assertEqual(len(self.expected), 0)
+
+    def test_parse_frames_garbage(self):
+        frame = "trash\x00Test\xff"
+
+        self.proto.buf = frame
+        self.proto.parse_frames()
+
+        self.assertEqual(len(self.expected), 1)
+        self.assertEqual(self.expected[0], "Test")

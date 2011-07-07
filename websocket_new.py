@@ -91,15 +91,18 @@ class WebSocketProtocol(ProtocolWrapper):
         Find frames in incoming data and pass them to the underlying protocol.
         """
 
-        while self.buf.startswith("\x00"):
+        start = self.buf.find("\x00")
+
+        while start != -1:
             end = self.buf.find("\xff")
             if end == -1:
                 # Incomplete frame, try again later.
                 return
             else:
-                frame, self.buf = self.buf[1:end], self.buf[end + 1:]
+                frame, self.buf = self.buf[start + 1:end], self.buf[end + 1:]
                 # Pass the frame to the underlying protocol.
                 ProtocolWrapper.dataReceived(self, frame)
+            start = self.buf.find("\x00")
 
     def send_frames(self):
         """
