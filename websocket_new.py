@@ -11,6 +11,7 @@ from struct import pack
 
 from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.web.http import datetimeToString
+from twisted.python import log
 
 NEGOTIATING, HYBI00_CHALLENGE, FRAMES = range(3)
 
@@ -21,7 +22,7 @@ def http_headers(s):
 
     d = {}
 
-    for line in s.split("\n"):
+    for line in s.split("\r\n"):
         try:
             key, value = [i.strip() for i in line.split(":")]
             d[key] = value
@@ -72,13 +73,17 @@ class WebSocketProtocol(ProtocolWrapper):
     buf = ""
     state = NEGOTIATING
 
+    def __init__(self, *args, **kwargs):
+        ProtocolWrapper.__init__(self, *args, **kwargs)
+        self.pending_frames = []
+
     def send_websocket_preamble(self):
         self.transport.writeSequence([
-            "HTTP/1.1 101 FYI I am not a webserver\n",
-            "Server: TwistedWebSocketWrapper/1.0\n",
-            "Date: %s\n" % datetimeToString(),
-            "Upgrade: WebSocket\n",
-            "Connection: Upgrade\n",
+            "HTTP/1.1 101 FYI I am not a webserver\r\n",
+            "Server: TwistedWebSocketWrapper/1.0\r\n",
+            "Date: %s\r\n" % datetimeToString(),
+            "Upgrade: WebSocket\r\n",
+            "Connection: Upgrade\r\n",
         ])
 
     def parse_frames(self):
@@ -96,36 +101,52 @@ class WebSocketProtocol(ProtocolWrapper):
                 # Pass the frame to the underlying protocol.
                 ProtocolWrapper.dataReceived(self, frame)
 
-    def connectionMade(self):
-        # Overriden to prevent the underlying protocol from getting started.
-        # We'll explicitly call connectionMade() later.
-        pass
+    def send_frames(self):
+        """
+        Send all pending frames.
+        """
+
+        if self.state == FRAMES:
+            for frame in self.pending_frames:
+                self.transport.write("\x00%s\xff" % frame)
+            self.pending_frames = []
 
     def dataReceived(self, data):
         self.buf += data
+        log.msg("buf %r" % self.buf)
 
         if self.state == NEGOTIATING:
             # Check to see if we've got a complete set of headers yet.
-            if "\n\n" in self.buf:
-                head, chaff, self.buf = self.buf.partition("\n\n")
-                headers = http_headers(head)
-                if not is_websocket(headers):
+            if "\r\n\r\n" in self.buf:
+                head, chaff, self.buf = self.buf.partition("\r\n\r\n")
+                self.headers = http_headers(head)
+                if not is_websocket(self.headers):
                     self.loseConnection()
-                if is_hybi00(headers):
-                    state = HYBI00_CHALLENGE
+                if is_hybi00(self.headers):
+                    self.state = HYBI00_CHALLENGE
 
         elif self.state == HYBI00_CHALLENGE:
             if len(self.buf) >= 8:
                 challenge, self.buf = self.buf[:8], self.buf[8:]
-                response = complete_hybi00(challenge)
+                response = complete_hybi00(self.headers, challenge)
                 self.send_websocket_preamble()
                 self.transport.write(response)
-                # Start the underlying protocol.
-                ProtocolWrapper.connectionMade(self)
                 self.state = FRAMES
 
         elif self.state == FRAMES:
             self.parse_frames()
+
+    def write(self, data):
+        """
+        Write to the transport.
+
+        This method will only be called by the underlying protocol.
+        """
+
+        log.msg("frame %r" % data)
+
+        self.pending_frames.append(data)
+        self.send_frames()
 
 class WebSocketFactory(WrappingFactory):
     """
