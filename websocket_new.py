@@ -5,15 +5,25 @@ Blind reimplementation of WebSockets as a standalone wrapper for Twisted
 protocols.
 """
 
+from base64 import b64encode, b64decode
 from hashlib import md5
 from string import digits
 from struct import pack
 
+from twisted.internet import reactor
 from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
-from twisted.web.http import datetimeToString
 from twisted.python import log
+from twisted.web.http import datetimeToString
 
 NEGOTIATING, HYBI00_CHALLENGE, FRAMES = range(3)
+
+encoders = {
+    "base64": b64encode,
+}
+
+decoders = {
+    "base64": b64decode,
+}
 
 def http_headers(s):
     """
@@ -71,6 +81,7 @@ class WebSocketProtocol(ProtocolWrapper):
     """
 
     buf = ""
+    codec = None
     state = NEGOTIATING
 
     def __init__(self, *args, **kwargs):
@@ -84,6 +95,7 @@ class WebSocketProtocol(ProtocolWrapper):
             "Date: %s\r\n" % datetimeToString(),
             "Upgrade: WebSocket\r\n",
             "Connection: Upgrade\r\n",
+            "\r\n",
         ])
 
     def parse_frames(self):
@@ -100,6 +112,9 @@ class WebSocketProtocol(ProtocolWrapper):
                 return
             else:
                 frame, self.buf = self.buf[start + 1:end], self.buf[end + 1:]
+                # Decode the frame, if we have a decoder.
+                if self.codec:
+                    frame = decoders[self.codec](frame)
                 # Pass the frame to the underlying protocol.
                 ProtocolWrapper.dataReceived(self, frame)
             start = self.buf.find("\x00")
@@ -111,22 +126,60 @@ class WebSocketProtocol(ProtocolWrapper):
 
         if self.state == FRAMES:
             for frame in self.pending_frames:
+                # Encode the frame before sending it.
+                if self.codec:
+                    frame = encoders[self.codec](frame)
                 self.transport.write("\x00%s\xff" % frame)
             self.pending_frames = []
 
+    def validate_headers(self):
+        """
+        Check received headers for sanity and correctness, and stash any data
+        from them which will be required later.
+        """
+
+        # Obvious but necessary.
+        if not is_websocket(self.headers):
+            log.msg("Not handling non-WS request")
+            return False
+
+        # Check whether a codec is needed. WS calls this a "protocol" for
+        # reasons I cannot fathom.
+        protocol = None
+        if "WebSocket-Protocol" in self.headers:
+            protocol = self.headers["WebSocket-Protocol"]
+        elif "Sec-WebSocket-Protocol" in self.headers:
+            protocol = self.headers["Sec-WebSocket-Protocol"]
+
+        if protocol:
+            if protocol not in encoders or protocol not in decoders:
+                log.msg("Couldn't handle WS protocol %s!" % protocol)
+                return False
+            self.codec = protocol
+
+        # Start the next phase of the handshake for HyBi-00.
+        if is_hybi00(self.headers):
+            log.msg("Starting HyBi-00/Hixie-76 handshake")
+            self.state = HYBI00_CHALLENGE
+
+        return True
+
     def dataReceived(self, data):
         self.buf += data
-        log.msg("buf %r" % self.buf)
 
         if self.state == NEGOTIATING:
             # Check to see if we've got a complete set of headers yet.
             if "\r\n\r\n" in self.buf:
                 head, chaff, self.buf = self.buf.partition("\r\n\r\n")
                 self.headers = http_headers(head)
-                if not is_websocket(self.headers):
+                # Validate headers. This will cause a state change.
+                if self.validate_headers():
+                    # Try to run the dataReceived() hook again; oftentimes
+                    # there will be a handshake in the same packet as the
+                    # headers!
+                    reactor.callLater(0, self.dataReceived, "")
+                else:
                     self.loseConnection()
-                if is_hybi00(self.headers):
-                    self.state = HYBI00_CHALLENGE
 
         elif self.state == HYBI00_CHALLENGE:
             if len(self.buf) >= 8:
@@ -134,7 +187,9 @@ class WebSocketProtocol(ProtocolWrapper):
                 response = complete_hybi00(self.headers, challenge)
                 self.send_websocket_preamble()
                 self.transport.write(response)
+                # Start sending frames, and kick any pending frames.
                 self.state = FRAMES
+                self.send_frames()
 
         elif self.state == FRAMES:
             self.parse_frames()
@@ -145,8 +200,6 @@ class WebSocketProtocol(ProtocolWrapper):
 
         This method will only be called by the underlying protocol.
         """
-
-        log.msg("frame %r" % data)
 
         self.pending_frames.append(data)
         self.send_frames()
