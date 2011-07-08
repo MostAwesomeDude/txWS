@@ -2,7 +2,7 @@ from twisted.trial import unittest
 
 from twisted.protocols.policies import ProtocolWrapper
 from vncap.websocket_new import (WebSocketProtocol, complete_hybi00,
-                                 http_headers)
+                                 http_headers, FRAMES)
 
 class TestHTTPHeaders(unittest.TestCase):
 
@@ -53,11 +53,18 @@ class TestWebSocketProtocolFrames(unittest.TestCase):
 
     def setUp(self):
         self.proto = WebSocketProtocol(None, None)
+        self.proto.state = FRAMES
 
         self.expected = []
-        def cb(chaff, data):
+        def dr(chaff, data):
             self.expected.append(data)
-        self.patch(ProtocolWrapper, "dataReceived", cb)
+        self.patch(ProtocolWrapper, "dataReceived", dr)
+
+        self.sent = []
+        class FakeTransport:
+            def write(chaff, data):
+                self.sent.append(data)
+        self.proto.transport = FakeTransport()
 
     def test_trivial(self):
         pass
@@ -97,3 +104,12 @@ class TestWebSocketProtocolFrames(unittest.TestCase):
 
         self.assertEqual(len(self.expected), 1)
         self.assertEqual(self.expected[0], "Test")
+
+    def test_send_frames_multiple(self):
+        self.proto.pending_frames.append("hello")
+        self.proto.pending_frames.append("world")
+
+        self.proto.send_frames()
+        self.assertEqual(len(self.sent), 2)
+        self.assertEqual(self.sent[0], "\x00hello\xff")
+        self.assertEqual(self.sent[1], "\x00world\xff")
