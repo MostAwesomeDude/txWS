@@ -13,9 +13,24 @@ class TestHTTPHeaders(unittest.TestCase):
         self.assertEqual(headers["Connection"], "Upgrade")
 
     def test_single_header_newline(self):
-        raw = "Connection: Upgrade\n"
+        raw = "Connection: Upgrade\r\n"
         headers = http_headers(raw)
         self.assertEqual(headers["Connection"], "Upgrade")
+
+    def test_multiple_headers(self):
+        raw = "Connection: Upgrade\r\nUpgrade: WebSocket"
+        headers = http_headers(raw)
+        self.assertEqual(headers["Connection"], "Upgrade")
+        self.assertEqual(headers["Upgrade"], "WebSocket")
+
+    def test_origin_colon(self):
+        """
+        Some headers have multiple colons in them.
+        """
+
+        raw = "Origin: http://example.com:8080"
+        headers = http_headers(raw)
+        self.assertEqual(headers["Origin"], "http://example.com:8080")
 
 class TestHyBi00(unittest.TestCase):
 

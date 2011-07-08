@@ -15,7 +15,7 @@ from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
 from twisted.web.http import datetimeToString
 
-NEGOTIATING, HYBI00_CHALLENGE, FRAMES = range(3)
+REQUEST, NEGOTIATING, HYBI00_CHALLENGE, FRAMES = range(4)
 
 encoders = {
     "base64": b64encode,
@@ -34,7 +34,7 @@ def http_headers(s):
 
     for line in s.split("\r\n"):
         try:
-            key, value = [i.strip() for i in line.split(":")]
+            key, value = [i.strip() for i in line.split(":", 1)]
             d[key] = value
         except ValueError:
             pass
@@ -82,7 +82,9 @@ class WebSocketProtocol(ProtocolWrapper):
 
     buf = ""
     codec = None
-    state = NEGOTIATING
+    location = "/"
+    origin = "http://example.com"
+    state = REQUEST
 
     def __init__(self, *args, **kwargs):
         ProtocolWrapper.__init__(self, *args, **kwargs)
@@ -95,6 +97,10 @@ class WebSocketProtocol(ProtocolWrapper):
             "Date: %s\r\n" % datetimeToString(),
             "Upgrade: WebSocket\r\n",
             "Connection: Upgrade\r\n",
+            "Sec-WebSocket-Origin: %s\r\n" % self.origin,
+            "Sec-WebSocket-Location: %s%s\r\n" % (self.origin, self.location),
+            "WebSocket-Protocol: %s\r\n" % self.codec,
+            "Sec-WebSocket-Protocol: %s\r\n" % self.codec,
             "\r\n",
         ])
 
@@ -143,6 +149,10 @@ class WebSocketProtocol(ProtocolWrapper):
             log.msg("Not handling non-WS request")
             return False
 
+        # Stash origin for those browsers that care about it.
+        if "Origin" in self.headers:
+            self.origin = self.headers["Origin"]
+
         # Check whether a codec is needed. WS calls this a "protocol" for
         # reasons I cannot fathom.
         protocol = None
@@ -167,7 +177,18 @@ class WebSocketProtocol(ProtocolWrapper):
     def dataReceived(self, data):
         self.buf += data
 
-        if self.state == NEGOTIATING:
+        if self.state == REQUEST:
+            if "\r\n" in self.buf:
+                request, chaff, self.buf = self.buf.partition("\r\n")
+                try:
+                    verb, self.location, version = request.split(" ")
+                except ValueError:
+                    self.loseConnection()
+                else:
+                    self.state = NEGOTIATING
+                    reactor.callLater(0, self.dataReceived, "")
+
+        elif self.state == NEGOTIATING:
             # Check to see if we've got a complete set of headers yet.
             if "\r\n\r\n" in self.buf:
                 head, chaff, self.buf = self.buf.partition("\r\n\r\n")
