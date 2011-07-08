@@ -83,6 +83,7 @@ class WebSocketProtocol(ProtocolWrapper):
     buf = ""
     codec = None
     location = "/"
+    host = "example.com"
     origin = "http://example.com"
     state = REQUEST
 
@@ -98,7 +99,7 @@ class WebSocketProtocol(ProtocolWrapper):
             "Upgrade: WebSocket\r\n",
             "Connection: Upgrade\r\n",
             "Sec-WebSocket-Origin: %s\r\n" % self.origin,
-            "Sec-WebSocket-Location: %s%s\r\n" % (self.origin, self.location),
+            "Sec-WebSocket-Location: ws://%s%s\r\n" % (self.host, self.location),
             "WebSocket-Protocol: %s\r\n" % self.codec,
             "Sec-WebSocket-Protocol: %s\r\n" % self.codec,
             "\r\n",
@@ -149,7 +150,9 @@ class WebSocketProtocol(ProtocolWrapper):
             log.msg("Not handling non-WS request")
             return False
 
-        # Stash origin for those browsers that care about it.
+        # Stash host and origin for those browsers that care about it.
+        if "Host" in self.headers:
+            self.host = self.headers["Host"]
         if "Origin" in self.headers:
             self.origin = self.headers["Origin"]
 
@@ -208,6 +211,7 @@ class WebSocketProtocol(ProtocolWrapper):
                 response = complete_hybi00(self.headers, challenge)
                 self.send_websocket_preamble()
                 self.transport.write(response)
+                log.msg("Completed HyBi-00/Hixie-76 handshake")
                 # Start sending frames, and kick any pending frames.
                 self.state = FRAMES
                 self.send_frames()
