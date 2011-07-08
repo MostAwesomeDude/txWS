@@ -1,8 +1,8 @@
 from twisted.trial import unittest
 
 from twisted.protocols.policies import ProtocolWrapper
-from vncap.websocket_new import (WebSocketProtocol, complete_hybi00,
-                                 http_headers, FRAMES)
+from vncap.websocket import (WebSocketProtocol, complete_hybi00, http_headers,
+                             FRAMES)
 
 class TestHTTPHeaders(unittest.TestCase):
 
