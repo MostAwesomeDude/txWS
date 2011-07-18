@@ -11,6 +11,7 @@ from string import digits
 from struct import pack
 
 from twisted.internet import reactor
+from twisted.internet.interfaces import ISSLTransport
 from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
 from twisted.web.http import datetimeToString
@@ -91,7 +92,16 @@ class WebSocketProtocol(ProtocolWrapper):
         ProtocolWrapper.__init__(self, *args, **kwargs)
         self.pending_frames = []
 
+    def is_secure(self):
+        """
+        Borrowed technique for determining whether this connection is over
+        SSL/TLS.
+        """
+
+        return ISSLTransport(self.transport, None) is not None
+
     def send_websocket_preamble(self):
+        protocol = "wss" if self.is_secure() else "ws"
         self.transport.writeSequence([
             "HTTP/1.1 101 FYI I am not a webserver\r\n",
             "Server: TwistedWebSocketWrapper/1.0\r\n",
@@ -99,7 +109,8 @@ class WebSocketProtocol(ProtocolWrapper):
             "Upgrade: WebSocket\r\n",
             "Connection: Upgrade\r\n",
             "Sec-WebSocket-Origin: %s\r\n" % self.origin,
-            "Sec-WebSocket-Location: ws://%s%s\r\n" % (self.host, self.location),
+            "Sec-WebSocket-Location: %s://%s%s\r\n" % (protocol, self.host,
+                                                       self.location),
             "WebSocket-Protocol: %s\r\n" % self.codec,
             "Sec-WebSocket-Protocol: %s\r\n" % self.codec,
             "\r\n",
