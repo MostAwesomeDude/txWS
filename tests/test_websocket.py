@@ -69,47 +69,47 @@ class TestWebSocketProtocolFrames(unittest.TestCase):
     def test_trivial(self):
         pass
 
-    def test_parse_frames_single(self):
+    def test_parseFrames_single(self):
         frame = "\x00Test\xff"
 
         self.proto.buf = frame
-        self.proto.parse_frames()
+        self.proto.parseFrames()
 
         self.assertEqual(len(self.expected), 1)
         self.assertEqual(self.expected[0], "Test")
 
-    def test_parse_frames_multiple(self):
+    def test_parseFrames_multiple(self):
         frame = "\x00Test\xff\x00Again\xff"
 
         self.proto.buf = frame
-        self.proto.parse_frames()
+        self.proto.parseFrames()
 
         self.assertEqual(len(self.expected), 2)
         self.assertEqual(self.expected[0], "Test")
         self.assertEqual(self.expected[1], "Again")
 
-    def test_parse_frames_incomplete(self):
+    def test_parseFrames_incomplete(self):
         frame = "\x00Test"
 
         self.proto.buf = frame
-        self.proto.parse_frames()
+        self.proto.parseFrames()
 
         self.assertEqual(len(self.expected), 0)
 
-    def test_parse_frames_garbage(self):
+    def test_parseFrames_garbage(self):
         frame = "trash\x00Test\xff"
 
         self.proto.buf = frame
-        self.proto.parse_frames()
+        self.proto.parseFrames()
 
         self.assertEqual(len(self.expected), 1)
         self.assertEqual(self.expected[0], "Test")
 
-    def test_send_frames_multiple(self):
+    def test_sendFrames_multiple(self):
         self.proto.pending_frames.append("hello")
         self.proto.pending_frames.append("world")
 
-        self.proto.send_frames()
+        self.proto.sendFrames()
         self.assertEqual(len(self.sent), 2)
         self.assertEqual(self.sent[0], "\x00hello\xff")
         self.assertEqual(self.sent[1], "\x00world\xff")

@@ -92,7 +92,7 @@ class WebSocketProtocol(ProtocolWrapper):
         ProtocolWrapper.__init__(self, *args, **kwargs)
         self.pending_frames = []
 
-    def is_secure(self):
+    def isSecure(self):
         """
         Borrowed technique for determining whether this connection is over
         SSL/TLS.
@@ -100,14 +100,31 @@ class WebSocketProtocol(ProtocolWrapper):
 
         return ISSLTransport(self.transport, None) is not None
 
-    def send_websocket_preamble(self):
-        protocol = "wss" if self.is_secure() else "ws"
+    def sendCommonPreamble(self):
+        """
+        Send the preamble common to all WebSockets connections.
+
+        This might go away in the future if WebSockets continue to diverge.
+        """
+
         self.transport.writeSequence([
             "HTTP/1.1 101 FYI I am not a webserver\r\n",
             "Server: TwistedWebSocketWrapper/1.0\r\n",
             "Date: %s\r\n" % datetimeToString(),
             "Upgrade: WebSocket\r\n",
             "Connection: Upgrade\r\n",
+        ])
+
+    def sendHyBi00Preamble(self):
+        """
+        Send a HyBi-00 preamble.
+        """
+
+        protocol = "wss" if self.isSecure() else "ws"
+
+        self.sendCommonPreamble()
+
+        self.transport.writeSequence([
             "Sec-WebSocket-Origin: %s\r\n" % self.origin,
             "Sec-WebSocket-Location: %s://%s%s\r\n" % (protocol, self.host,
                                                        self.location),
@@ -116,7 +133,7 @@ class WebSocketProtocol(ProtocolWrapper):
             "\r\n",
         ])
 
-    def parse_frames(self):
+    def parseFrames(self):
         """
         Find frames in incoming data and pass them to the underlying protocol.
         """
@@ -137,7 +154,7 @@ class WebSocketProtocol(ProtocolWrapper):
                 ProtocolWrapper.dataReceived(self, frame)
             start = self.buf.find("\x00")
 
-    def send_frames(self):
+    def sendFrames(self):
         """
         Send all pending frames.
         """
@@ -150,7 +167,7 @@ class WebSocketProtocol(ProtocolWrapper):
                 self.transport.write("\x00%s\xff" % frame)
             self.pending_frames = []
 
-    def validate_headers(self):
+    def validateHeaders(self):
         """
         Check received headers for sanity and correctness, and stash any data
         from them which will be required later.
@@ -208,7 +225,7 @@ class WebSocketProtocol(ProtocolWrapper):
                 head, chaff, self.buf = self.buf.partition("\r\n\r\n")
                 self.headers = http_headers(head)
                 # Validate headers. This will cause a state change.
-                if self.validate_headers():
+                if self.validateHeaders():
                     # Try to run the dataReceived() hook again; oftentimes
                     # there will be a handshake in the same packet as the
                     # headers!
@@ -220,15 +237,15 @@ class WebSocketProtocol(ProtocolWrapper):
             if len(self.buf) >= 8:
                 challenge, self.buf = self.buf[:8], self.buf[8:]
                 response = complete_hybi00(self.headers, challenge)
-                self.send_websocket_preamble()
+                self.sendHyBi00Preamble()
                 self.transport.write(response)
                 log.msg("Completed HyBi-00/Hixie-76 handshake")
                 # Start sending frames, and kick any pending frames.
                 self.state = FRAMES
-                self.send_frames()
+                self.sendFrames()
 
         elif self.state == FRAMES:
-            self.parse_frames()
+            self.parseFrames()
 
     def write(self, data):
         """
@@ -238,7 +255,7 @@ class WebSocketProtocol(ProtocolWrapper):
         """
 
         self.pending_frames.append(data)
-        self.send_frames()
+        self.sendFrames()
 
 class WebSocketFactory(WrappingFactory):
     """
