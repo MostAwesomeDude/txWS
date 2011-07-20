@@ -113,3 +113,26 @@ class TestWebSocketProtocolFrames(unittest.TestCase):
         self.assertEqual(len(self.sent), 2)
         self.assertEqual(self.sent[0], "\x00hello\xff")
         self.assertEqual(self.sent[1], "\x00world\xff")
+
+    def test_socketio_crashers(self):
+        """
+        A series of snippets which crash other WebSockets implementations
+        (specifically, Socket.IO) are harmless to this implementation.
+        """
+
+        frames = [
+            """[{"length":1}]""",
+            """{"messages":[{"length":1}]}""",
+            "hello",
+            "hello<script>alert(/xss/)</script>",
+            "hello<img src=x:x onerror=alert(/xss.2/)>",
+            "{",
+            "~m~EVJLFDJP~",
+        ]
+
+        for frame in frames:
+            self.proto.dataReceived("\x00%s\xff" % frame)
+            self.assertEqual(len(self.expected), 1)
+            self.assertEqual(self.expected[0], frame)
+
+            self.expected.pop()
