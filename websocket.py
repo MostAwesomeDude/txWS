@@ -10,7 +10,6 @@ from hashlib import md5
 from string import digits
 from struct import pack
 
-from twisted.internet import reactor
 from twisted.internet.interfaces import ISSLTransport
 from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
@@ -208,44 +207,49 @@ class WebSocketProtocol(ProtocolWrapper):
     def dataReceived(self, data):
         self.buf += data
 
-        if self.state == REQUEST:
-            if "\r\n" in self.buf:
-                request, chaff, self.buf = self.buf.partition("\r\n")
-                try:
-                    verb, self.location, version = request.split(" ")
-                except ValueError:
-                    self.loseConnection()
-                else:
-                    self.state = NEGOTIATING
-                    reactor.callLater(0, self.dataReceived, "")
+        oldstate = None
 
-        elif self.state == NEGOTIATING:
-            # Check to see if we've got a complete set of headers yet.
-            if "\r\n\r\n" in self.buf:
-                head, chaff, self.buf = self.buf.partition("\r\n\r\n")
-                self.headers = http_headers(head)
-                # Validate headers. This will cause a state change.
-                if self.validateHeaders():
-                    # Try to run the dataReceived() hook again; oftentimes
-                    # there will be a handshake in the same packet as the
-                    # headers!
-                    reactor.callLater(0, self.dataReceived, "")
-                else:
-                    self.loseConnection()
+        while oldstate != self.state:
+            oldstate = self.state
 
-        elif self.state == HYBI00_CHALLENGE:
-            if len(self.buf) >= 8:
-                challenge, self.buf = self.buf[:8], self.buf[8:]
-                response = complete_hybi00(self.headers, challenge)
-                self.sendHyBi00Preamble()
-                self.transport.write(response)
-                log.msg("Completed HyBi-00/Hixie-76 handshake")
-                # Start sending frames, and kick any pending frames.
-                self.state = FRAMES
-                self.sendFrames()
+            # Handle initial requests. These look very much like HTTP
+            # requests, but aren't. We need to capture the request path for
+            # those browsers which want us to echo it back to them (Chrome,
+            # mainly.)
+            # These lines look like:
+            # GET /some/path/to/a/websocket/resource HTTP/1.1
+            if self.state == REQUEST:
+                if "\r\n" in self.buf:
+                    request, chaff, self.buf = self.buf.partition("\r\n")
+                    try:
+                        verb, self.location, version = request.split(" ")
+                    except ValueError:
+                        self.loseConnection()
+                    else:
+                        self.state = NEGOTIATING
 
-        elif self.state == FRAMES:
-            self.parseFrames()
+            elif self.state == NEGOTIATING:
+                # Check to see if we've got a complete set of headers yet.
+                if "\r\n\r\n" in self.buf:
+                    head, chaff, self.buf = self.buf.partition("\r\n\r\n")
+                    self.headers = http_headers(head)
+                    # Validate headers. This will cause a state change.
+                    if not self.validateHeaders():
+                        self.loseConnection()
+
+            elif self.state == HYBI00_CHALLENGE:
+                if len(self.buf) >= 8:
+                    challenge, self.buf = self.buf[:8], self.buf[8:]
+                    response = complete_hybi00(self.headers, challenge)
+                    self.sendHyBi00Preamble()
+                    self.transport.write(response)
+                    log.msg("Completed HyBi-00/Hixie-76 handshake")
+                    # Start sending frames, and kick any pending frames.
+                    self.state = FRAMES
+                    self.sendFrames()
+
+            elif self.state == FRAMES:
+                self.parseFrames()
 
     def write(self, data):
         """
