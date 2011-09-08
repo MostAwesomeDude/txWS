@@ -15,7 +15,7 @@ from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
 from twisted.web.http import datetimeToString
 
-REQUEST, NEGOTIATING, HYBI00_CHALLENGE, FRAMES = range(4)
+REQUEST, NEGOTIATING, HYBI00_CHALLENGE, HYBI07, FRAMES = range(5)
 
 encoders = {
     "base64": b64encode,
@@ -47,7 +47,7 @@ def is_websocket(headers):
     """
 
     return (headers.get("Connection") == "Upgrade"
-            and headers.get("Upgrade") == "WebSocket")
+            and headers.get("Upgrade").lower() == "websocket")
 
 def is_hybi00(headers):
     """
@@ -58,13 +58,6 @@ def is_hybi00(headers):
     """
 
     return "Sec-WebSocket-Key1" in headers and "Sec-WebSocket-Key2" in headers
-
-def is_hybi_07(headers):
-    """
-    Determine whether a given set of headers asks for HyBi-07.
-    """
-
-    return headers.get("Sec-WebSocket-Version") == 7
 
 def complete_hybi00(headers, challenge):
     """
@@ -150,6 +143,16 @@ class WebSocketProtocol(ProtocolWrapper):
             "\r\n",
         ])
 
+    def sendHyBi07Preamble(self):
+        """
+        Send a HyBi-07 preamble.
+        """
+
+        self.sendCommonPreamble()
+
+        self.transport.write("Sec-WebSocket-Accept: %s\r\n\r\n" %
+                             make_accept(self.headers))
+
     def parseFrames(self):
         """
         Find frames in incoming data and pass them to the underlying protocol.
@@ -220,6 +223,11 @@ class WebSocketProtocol(ProtocolWrapper):
             log.msg("Starting HyBi-00/Hixie-76 handshake")
             self.state = HYBI00_CHALLENGE
 
+        # Start the next phase of the handshake for HyBi-07+.
+        if "Sec-WebSocket-Version" in self.headers:
+            log.msg("Starting HyBi-07+ (v6, v7) handshake")
+            self.state = HYBI07
+
         return True
 
     def dataReceived(self, data):
@@ -265,6 +273,12 @@ class WebSocketProtocol(ProtocolWrapper):
                     # Start sending frames, and kick any pending frames.
                     self.state = FRAMES
                     self.sendFrames()
+
+            elif self.state == HYBI07:
+                self.sendHyBi07Preamble()
+                log.msg("Completed HyBi07+ handshake")
+                self.state = FRAMES
+                self.sendFrames()
 
             elif self.state == FRAMES:
                 self.parseFrames()

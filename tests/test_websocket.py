@@ -44,6 +44,15 @@ class TestKeys(unittest.TestCase):
 
         self.assertEqual(make_accept(key), "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=")
 
+    def test_make_accept_wikipedia(self):
+        """
+        Test ``make_accept()`` using the keys listed on Wikipedia.
+        """
+
+        key = "x3JJHMbDL1EzLkh9GBhXDw=="
+
+        self.assertEqual(make_accept(key), "HSmrc0sMlYUkAGmm5OPpG2HaGWk=")
+
 class TestHyBi00(unittest.TestCase):
 
     def test_complete_hybi00_wikipedia(self):
