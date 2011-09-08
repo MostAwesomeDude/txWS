@@ -6,7 +6,7 @@ protocols.
 """
 
 from base64 import b64encode, b64decode
-from hashlib import md5
+from hashlib import md5, sha1
 from string import digits
 from struct import pack
 
@@ -59,6 +59,13 @@ def is_hybi00(headers):
 
     return "Sec-WebSocket-Key1" in headers and "Sec-WebSocket-Key2" in headers
 
+def is_hybi_07(headers):
+    """
+    Determine whether a given set of headers asks for HyBi-07.
+    """
+
+    return headers.get("Sec-WebSocket-Version") == 7
+
 def complete_hybi00(headers, challenge):
     """
     Generate the response for a HyBi-00 challenge.
@@ -73,6 +80,17 @@ def complete_hybi00(headers, challenge):
     nonce = pack(">II8s", first, second, challenge)
 
     return md5(nonce).digest()
+
+def make_accept(key):
+    """
+    Create an "accept" response for a given key.
+
+    This dance is expected to somehow magically make WebSockets secure.
+    """
+
+    guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+    return sha1("%s%s" % (key, guid)).digest().encode("base64").strip()
 
 class WebSocketProtocol(ProtocolWrapper):
     """

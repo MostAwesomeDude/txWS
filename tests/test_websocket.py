@@ -1,8 +1,8 @@
 from twisted.trial import unittest
 
 from twisted.protocols.policies import ProtocolWrapper
-from vncap.websocket import (WebSocketProtocol, complete_hybi00, http_headers,
-                             FRAMES)
+from vncap.websocket import (WebSocketProtocol, complete_hybi00,
+                             http_headers, make_accept, FRAMES)
 
 class TestHTTPHeaders(unittest.TestCase):
 
@@ -31,6 +31,18 @@ class TestHTTPHeaders(unittest.TestCase):
         raw = "Origin: http://example.com:8080"
         headers = http_headers(raw)
         self.assertEqual(headers["Origin"], "http://example.com:8080")
+
+class TestKeys(unittest.TestCase):
+
+    def test_make_accept_rfc(self):
+        """
+        Test ``make_accept()`` using the keys listed in the RFC for HyBi-07
+        through HyBi-10.
+        """
+
+        key = "dGhlIHNhbXBsZSBub25jZQ=="
+
+        self.assertEqual(make_accept(key), "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=")
 
 class TestHyBi00(unittest.TestCase):
 
