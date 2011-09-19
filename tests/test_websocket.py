@@ -2,6 +2,7 @@ from twisted.trial import unittest
 
 from twisted.protocols.policies import ProtocolWrapper
 from vncap.websocket import (WebSocketProtocol, complete_hybi00,
+                             make_hybi00_frame, parse_hybi00_frames,
                              http_headers, make_accept, FRAMES)
 
 class TestHTTPHeaders(unittest.TestCase):
@@ -69,6 +70,13 @@ class TestHyBi00(unittest.TestCase):
 
         self.assertEqual(complete_hybi00(headers, challenge),
                          "8jKS'y:G*Co,Wxa-")
+
+    def test_make_hybi00(self):
+        """
+        HyBi-00 frames are really, *really* simple.
+        """
+
+        self.assertEqual(make_hybi00_frame("Test!"), "\x00Test!\xff")
 
 class TestWebSocketProtocolFrames(unittest.TestCase):
 

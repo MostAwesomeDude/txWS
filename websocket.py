@@ -25,6 +25,9 @@ decoders = {
     "base64": b64decode,
 }
 
+# Fake HTTP stuff, and a couple convenience methods for examining fake HTTP
+# headers.
+
 def http_headers(s):
     """
     Create a dictionary of data from raw HTTP headers.
@@ -59,6 +62,8 @@ def is_hybi00(headers):
 
     return "Sec-WebSocket-Key1" in headers and "Sec-WebSocket-Key2" in headers
 
+# Authentication for WS.
+
 def complete_hybi00(headers, challenge):
     """
     Generate the response for a HyBi-00 challenge.
@@ -84,6 +89,46 @@ def make_accept(key):
     guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
     return sha1("%s%s" % (key, guid)).digest().encode("base64").strip()
+
+# Frame helpers.
+# Separated out to make unit testing a lot easier.
+# Frames are bonghits in newer WS versions, so helpers are appreciated.
+
+def make_hybi00_frame(buf):
+    """
+    Make a HyBi-00 frame from some data.
+
+    This function does exactly zero checks to make sure that the data is safe
+    and valid text without any 0xff bytes.
+    """
+
+    return "\x00%s\xff" % buf
+
+def parse_hybi00_frames(buf):
+    """
+    Parse HyBi-00 frames, returning unwrapped frames and any unmatched data.
+
+    This function does not care about garbage data on the wire between frames,
+    and will actively ignore it.
+    """
+
+    start = buf.find("\x00")
+    frames = []
+
+    while start != -1:
+        end = buf.find("\xff")
+        if end == -1:
+            # Incomplete frame, try again later.
+            return frames, buf
+        else:
+            frame, buf = buf[start + 1:end], buf[end + 1:]
+            # Found a frame, put it in the list.
+            frames.append(frame)
+        start = buf.find("\x00")
+
+    # We appear to have hit an exact frame boundary. This is actually pretty
+    # likely with a lot of implementations.
+    return frames, buf
 
 class WebSocketProtocol(ProtocolWrapper):
     """
@@ -158,21 +203,14 @@ class WebSocketProtocol(ProtocolWrapper):
         Find frames in incoming data and pass them to the underlying protocol.
         """
 
-        start = self.buf.find("\x00")
+        frames, self.buf = parse_hybi00_frames(self.buf)
 
-        while start != -1:
-            end = self.buf.find("\xff")
-            if end == -1:
-                # Incomplete frame, try again later.
-                return
-            else:
-                frame, self.buf = self.buf[start + 1:end], self.buf[end + 1:]
-                # Decode the frame, if we have a decoder.
-                if self.codec:
-                    frame = decoders[self.codec](frame)
-                # Pass the frame to the underlying protocol.
-                ProtocolWrapper.dataReceived(self, frame)
-            start = self.buf.find("\x00")
+        for frame in frames:
+            # Decode the frame, if we have a decoder.
+            if self.codec:
+                frame = decoders[self.codec](frame)
+            # Pass the frame to the underlying protocol.
+            ProtocolWrapper.dataReceived(self, frame)
 
     def sendFrames(self):
         """
@@ -184,7 +222,8 @@ class WebSocketProtocol(ProtocolWrapper):
                 # Encode the frame before sending it.
                 if self.codec:
                     frame = encoders[self.codec](frame)
-                self.transport.write("\x00%s\xff" % frame)
+                packet = make_hybi00_frame(frame)
+                self.transport.write(packet)
             self.pending_frames = []
 
     def validateHeaders(self):
@@ -233,6 +272,8 @@ class WebSocketProtocol(ProtocolWrapper):
     def dataReceived(self, data):
         self.buf += data
 
+        log.msg("Got data, buffer is %r" % self.buf)
+
         oldstate = None
 
         while oldstate != self.state:
@@ -276,7 +317,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
             elif self.state == HYBI07:
                 self.sendHyBi07Preamble()
-                log.msg("Completed HyBi07+ handshake")
+                log.msg("Completed HyBi-07+ handshake")
                 self.state = FRAMES
                 self.sendFrames()
 
