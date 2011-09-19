@@ -78,70 +78,41 @@ class TestHyBi00(unittest.TestCase):
 
         self.assertEqual(make_hybi00_frame("Test!"), "\x00Test!\xff")
 
-class TestWebSocketProtocolFrames(unittest.TestCase):
-
-    def setUp(self):
-        self.proto = WebSocketProtocol(None, None)
-        self.proto.state = FRAMES
-
-        self.expected = []
-        def dr(chaff, data):
-            self.expected.append(data)
-        self.patch(ProtocolWrapper, "dataReceived", dr)
-
-        self.sent = []
-        class FakeTransport:
-            def write(chaff, data):
-                self.sent.append(data)
-        self.proto.transport = FakeTransport()
-
-    def test_trivial(self):
-        pass
-
-    def test_parseFrames_single(self):
+    def test_parse_hybi00_single(self):
         frame = "\x00Test\xff"
 
-        self.proto.buf = frame
-        self.proto.parseFrames()
+        frames, buf = parse_hybi00_frames(frame)
 
-        self.assertEqual(len(self.expected), 1)
-        self.assertEqual(self.expected[0], "Test")
+        self.assertEqual(len(frames), 1)
+        self.assertEqual(frames[0], "Test")
+        self.assertEqual(buf, "")
 
-    def test_parseFrames_multiple(self):
+    def test_parse_hybi00_multiple(self):
         frame = "\x00Test\xff\x00Again\xff"
 
-        self.proto.buf = frame
-        self.proto.parseFrames()
+        frames, buf = parse_hybi00_frames(frame)
 
-        self.assertEqual(len(self.expected), 2)
-        self.assertEqual(self.expected[0], "Test")
-        self.assertEqual(self.expected[1], "Again")
+        self.assertEqual(len(frames), 2)
+        self.assertEqual(frames[0], "Test")
+        self.assertEqual(frames[1], "Again")
+        self.assertEqual(buf, "")
 
-    def test_parseFrames_incomplete(self):
+    def test_parse_hybi00_incomplete(self):
         frame = "\x00Test"
 
-        self.proto.buf = frame
-        self.proto.parseFrames()
+        frames, buf = parse_hybi00_frames(frame)
 
-        self.assertEqual(len(self.expected), 0)
+        self.assertEqual(len(frames), 0)
+        self.assertEqual(buf, "\x00Test")
 
-    def test_parseFrames_garbage(self):
+    def test_parse_hybi00_garbage(self):
         frame = "trash\x00Test\xff"
 
-        self.proto.buf = frame
-        self.proto.parseFrames()
+        frames, buf = parse_hybi00_frames(frame)
 
-        self.assertEqual(len(self.expected), 1)
-        self.assertEqual(self.expected[0], "Test")
-
-    def test_sendFrames_multiple(self):
-        self.proto.pending_frames.append("hello")
-        self.proto.pending_frames.append("world")
-
-        self.proto.sendFrames()
-        self.assertEqual(len(self.sent), 2)
-        self.assertEqual(self.sent[0], "\x00hello\xff")
-        self.assertEqual(self.sent[1], "\x00world\xff")
+        self.assertEqual(len(frames), 1)
+        self.assertEqual(frames[0], "Test")
+        self.assertEqual(buf, "")
 
     def test_socketio_crashers(self):
         """
@@ -160,8 +131,9 @@ class TestWebSocketProtocolFrames(unittest.TestCase):
         ]
 
         for frame in frames:
-            self.proto.dataReceived("\x00%s\xff" % frame)
-            self.assertEqual(len(self.expected), 1)
-            self.assertEqual(self.expected[0], frame)
+            prepared = make_hybi00_frame(frame)
+            frames, buf = parse_hybi00_frames(prepared)
 
-            self.expected.pop()
+            self.assertEqual(len(frames), 1)
+            self.assertEqual(frames[0], frame)
+            self.assertEqual(buf, "")
