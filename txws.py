@@ -18,10 +18,10 @@ from twisted.web.http import datetimeToString
 # Flavors of WS supported here.
 # HYBI00 - Hixie-76, HyBi-00. Challenge/response after headers, very minimal
 #          framing. Tricky to start up, but very smooth sailing afterwards.
-# HYBI06 - HyBi-06, HyBi-07. Modern "standard" handshake. Bizarre masked
-#          frames, lots of binary data packing.
+# HYBI07 - HyBi-07. Modern "standard" handshake. Bizarre masked frames, lots
+#          of binary data packing.
 
-HYBI00, HYBI06 = range(2)
+HYBI00, HYBI07 = range(2)
 
 # States of the state machine. Because there are no reliable byte counts for
 # any of this, we don't use StatefulProtocol; instead, we use custom state
@@ -170,17 +170,17 @@ def mask(buf, key):
         buf[i] = chr(ord(char) ^ key[i % 4])
     return "".join(buf)
 
-def make_hybi06_frame(buf):
+def make_hybi07_frame(buf):
     """
-    Make a HyBi-06 frame.
+    Make a HyBi-07 frame.
     """
 
     # XXX next commit
     return None
 
-def parse_hybi06_frames(buf):
+def parse_hybi07_frames(buf):
     """
-    Parse HyBi-06 frames in a highly compliant manner.
+    Parse HyBi-07 frames in a highly compliant manner.
 
     This function requires *complete* frames and does highly bogus things if
     fed incomplete frames.
@@ -194,7 +194,7 @@ def parse_hybi06_frames(buf):
         header, buf = ord(buf[0]), buf[1:]
         if header & 0x70:
             # At least one of the reserved flags is set. Pork chop sandwiches!
-            raise Exception("Reserved flag in HyBi-06 frame (%d)" % header)
+            raise Exception("Reserved flag in HyBi-07 frame (%d)" % header)
             frames.append(("", CLOSE))
             return frames, buf
 
@@ -204,7 +204,7 @@ def parse_hybi06_frames(buf):
         try:
             opcode = opcode_types[opcode]
         except KeyError:
-            raise Exception("Unknown opcode %d in HyBi-06 frame!" % opcode)
+            raise Exception("Unknown opcode %d in HyBi-07 frame!" % opcode)
 
         # Get the payload length and determine whether we need to look for an
         # extra length.
@@ -300,9 +300,9 @@ class WebSocketProtocol(ProtocolWrapper):
             "\r\n",
         ])
 
-    def sendHyBi06Preamble(self):
+    def sendHyBi07Preamble(self):
         """
-        Send a HyBi-06 preamble.
+        Send a HyBi-07 preamble.
         """
 
         self.sendCommonPreamble()
@@ -317,8 +317,8 @@ class WebSocketProtocol(ProtocolWrapper):
 
         if self.flavor == HYBI00:
             parser = parse_hybi00_frames
-        elif self.flavor == HYBI06:
-            parser = parse_hybi06_frames
+        elif self.flavor == HYBI07:
+            parser = parse_hybi07_frames
         else:
             raise Exception("Unknown flavor %r!" % self.flavor)
 
@@ -351,8 +351,8 @@ class WebSocketProtocol(ProtocolWrapper):
 
         if self.flavor == HYBI00:
             maker = make_hybi00_frame
-        elif self.flavor == HYBI06:
-            maker = make_hybi06_frame
+        elif self.flavor == HYBI07:
+            maker = make_hybi07_frame
         else:
             raise Exception("Unknown flavor %r!" % self.flavor)
 
@@ -401,12 +401,17 @@ class WebSocketProtocol(ProtocolWrapper):
             self.flavor = HYBI00
             self.state = CHALLENGE
 
-        # Start the next phase of the handshake for HyBi-06+.
+        # Start the next phase of the handshake for HyBi-07+.
         if "Sec-WebSocket-Version" in self.headers:
-            log.msg("Starting HyBi-06+ (v6, v7) conversation")
-            self.sendHyBi06Preamble()
-            self.flavor = HYBI06
-            self.state = FRAMES
+            version = self.headers["Sec-WebSocket-Version"]
+            if version == "7":
+                log.msg("Starting HyBi-07 conversation")
+                self.sendHyBi07Preamble()
+                self.flavor = HYBI07
+                self.state = FRAMES
+            else:
+                log.msg("Can't support protocol version %s!" % version)
+                return False
 
         return True
 

@@ -2,7 +2,7 @@ from twisted.trial import unittest
 
 from txws import (complete_hybi00, make_hybi00_frame, parse_hybi00_frames,
                   http_headers, make_accept, mask, NORMAL, PING, PONG,
-                  parse_hybi06_frames)
+                  parse_hybi07_frames)
 
 class TestHTTPHeaders(unittest.TestCase):
 
@@ -137,9 +137,9 @@ class TestHyBi00(unittest.TestCase):
             self.assertEqual(frames[0], (NORMAL, frame))
             self.assertEqual(buf, "")
 
-class TestHyBi06Helpers(unittest.TestCase):
+class TestHyBi07Helpers(unittest.TestCase):
     """
-    HyBi-06 is best understood as a large family of helper functions which
+    HyBi-07 is best understood as a large family of helper functions which
     work together, somewhat dysfunctionally, to produce a mediocre
     Thanksgiving every other year.
     """
@@ -152,29 +152,29 @@ class TestHyBi06Helpers(unittest.TestCase):
         key = "\x00\x00\x00\x00"
         self.assertEqual(mask("LongTest", key), "LongTest")
 
-    def test_parse_hybi06_unmasked_text(self):
+    def test_parse_hybi07_unmasked_text(self):
         """
         From HyBi-10, 4.7.
         """
 
         frame = "\x81\x05Hello"
-        frames, buf = parse_hybi06_frames(frame)
+        frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
         self.assertEqual(frames[0], (NORMAL, "Hello"))
         self.assertEqual(buf, "")
 
-    def test_parse_hybi06_masked_text(self):
+    def test_parse_hybi07_masked_text(self):
         """
         From HyBi-10, 4.7.
         """
 
         frame = "\x81\x857\xfa!=\x7f\x9fMQX"
-        frames, buf = parse_hybi06_frames(frame)
+        frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
         self.assertEqual(frames[0], (NORMAL, "Hello"))
         self.assertEqual(buf, "")
 
-    def test_parse_hybi06_unmasked_text_fragments(self):
+    def test_parse_hybi07_unmasked_text_fragments(self):
         """
         We don't care about fragments. We are totally unfazed.
 
@@ -182,30 +182,30 @@ class TestHyBi06Helpers(unittest.TestCase):
         """
 
         frame = "\x01\x03Hel\x80\x02lo"
-        frames, buf = parse_hybi06_frames(frame)
+        frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 2)
         self.assertEqual(frames[0], (NORMAL, "Hel"))
         self.assertEqual(frames[1], (NORMAL, "lo"))
         self.assertEqual(buf, "")
 
-    def test_parse_hybi06_ping(self):
+    def test_parse_hybi07_ping(self):
         """
         From HyBi-10, 4.7.
         """
 
         frame = "\x89\x05Hello"
-        frames, buf = parse_hybi06_frames(frame)
+        frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
         self.assertEqual(frames[0], (PING, "Hello"))
         self.assertEqual(buf, "")
 
-    def test_parse_hybi06_pong(self):
+    def test_parse_hybi07_pong(self):
         """
         From HyBi-10, 4.7.
         """
 
         frame = "\x8a\x05Hello"
-        frames, buf = parse_hybi06_frames(frame)
+        frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
         self.assertEqual(frames[0], (PONG, "Hello"))
         self.assertEqual(buf, "")
