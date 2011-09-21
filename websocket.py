@@ -27,7 +27,7 @@ HYBI00, HYBI06 = range(2)
 # any of this, we don't use StatefulProtocol; instead, we use custom state
 # enumerations. Yay!
 
-REQUEST, NEGOTIATING, HYBI00_CHALLENGE, HYBI07, FRAMES = range(5)
+REQUEST, NEGOTIATING, CHALLENGE, FRAMES = range(4)
 
 # Control frame specifiers. Some versions of WS have control signals sent
 # in-band. Adorable, right?
@@ -149,7 +149,7 @@ def parse_hybi00_frames(buf):
         else:
             frame, buf = buf[start + 1:end], buf[end + 1:]
             # Found a frame, put it in the list.
-            frames.append(frame)
+            frames.append((NORMAL, frame))
         start = buf.find("\x00")
 
     # We appear to have hit an exact frame boundary. This is actually pretty
@@ -169,6 +169,14 @@ def mask(buf, key):
     for i, char in enumerate(buf):
         buf[i] = chr(ord(char) ^ key[i % 4])
     return "".join(buf)
+
+def make_hybi06_frame(buf):
+    """
+    Make a HyBi-06 frame.
+    """
+
+    # XXX next commit
+    return None
 
 def parse_hybi06_frames(buf):
     """
@@ -225,7 +233,11 @@ def parse_hybi06_frames(buf):
         if masked:
             data = mask(data, key)
 
-        frames.append((data, opcode))
+        if opcode == CLOSE:
+            # Gotta unpack the opcode and return usable data here.
+            data = unpack(">H", data[:2])[0], data[2:]
+
+        frames.append((opcode, data))
 
     return frames, buf
 
@@ -241,6 +253,7 @@ class WebSocketProtocol(ProtocolWrapper):
     host = "example.com"
     origin = "http://example.com"
     state = REQUEST
+    flavor = None
 
     def __init__(self, *args, **kwargs):
         ProtocolWrapper.__init__(self, *args, **kwargs)
@@ -287,9 +300,9 @@ class WebSocketProtocol(ProtocolWrapper):
             "\r\n",
         ])
 
-    def sendHyBi07Preamble(self):
+    def sendHyBi06Preamble(self):
         """
-        Send a HyBi-07 preamble.
+        Send a HyBi-06 preamble.
         """
 
         self.sendCommonPreamble()
@@ -302,28 +315,54 @@ class WebSocketProtocol(ProtocolWrapper):
         Find frames in incoming data and pass them to the underlying protocol.
         """
 
-        frames, self.buf = parse_hybi00_frames(self.buf)
+        if self.flavor == HYBI00:
+            parser = parse_hybi00_frames
+        elif self.flavor == HYBI06:
+            parser = parse_hybi06_frames
+        else:
+            raise Exception("Unknown flavor %r!" % self.flavor)
+
+        frames, self.buf = parser(self.buf)
 
         for frame in frames:
-            # Decode the frame, if we have a decoder.
-            if self.codec:
-                frame = decoders[self.codec](frame)
-            # Pass the frame to the underlying protocol.
-            ProtocolWrapper.dataReceived(self, frame)
+            opcode = frame[0]
+            if opcode == NORMAL:
+                # Business as usual. Decode the frame, if we have a decoder.
+                if self.codec:
+                    frame = decoders[self.codec](frame)
+                # Pass the frame to the underlying protocol.
+                ProtocolWrapper.dataReceived(self, frame)
+            elif opcode == CLOSE:
+                # The other side wants us to close. I wonder why?
+                reason, text = frame[1]
+                log.msg("Closing connection: %r (%d)" % (text, reason))
+
+                # Send the smallest possible closing message.
+                # XXX totally protocol-7 specific
+                self.transport.write("\x88\x00")
 
     def sendFrames(self):
         """
         Send all pending frames.
         """
 
-        if self.state == FRAMES:
-            for frame in self.pending_frames:
-                # Encode the frame before sending it.
-                if self.codec:
-                    frame = encoders[self.codec](frame)
-                packet = make_hybi00_frame(frame)
-                self.transport.write(packet)
-            self.pending_frames = []
+        if self.state != FRAMES:
+            return
+
+        if self.flavor == HYBI00:
+            maker = make_hybi00_frame
+        elif self.flavor == HYBI06:
+            maker = make_hybi06_frame
+        else:
+            raise Exception("Unknown flavor %r!" % self.flavor)
+
+        for frame in self.pending_frames:
+            # Encode the frame before sending it.
+            if self.codec:
+                frame = encoders[self.codec](frame)
+            packet = maker(frame)
+            self.transport.write(packet)
+        self.pending_frames = []
 
     def validateHeaders(self):
         """
@@ -359,12 +398,15 @@ class WebSocketProtocol(ProtocolWrapper):
         # Start the next phase of the handshake for HyBi-00.
         if is_hybi00(self.headers):
             log.msg("Starting HyBi-00/Hixie-76 handshake")
-            self.state = HYBI00_CHALLENGE
+            self.flavor = HYBI00
+            self.state = CHALLENGE
 
-        # Start the next phase of the handshake for HyBi-07+.
+        # Start the next phase of the handshake for HyBi-06+.
         if "Sec-WebSocket-Version" in self.headers:
-            log.msg("Starting HyBi-07+ (v6, v7) handshake")
-            self.state = HYBI07
+            log.msg("Starting HyBi-06+ (v6, v7) conversation")
+            self.sendHyBi06Preamble()
+            self.flavor = HYBI06
+            self.state = FRAMES
 
         return True
 
@@ -403,7 +445,9 @@ class WebSocketProtocol(ProtocolWrapper):
                     if not self.validateHeaders():
                         self.loseConnection()
 
-            elif self.state == HYBI00_CHALLENGE:
+            elif self.state == CHALLENGE:
+                # Handle the challenge. This is completely exclusive to
+                # HyBi-00/Hixie-76.
                 if len(self.buf) >= 8:
                     challenge, self.buf = self.buf[:8], self.buf[8:]
                     response = complete_hybi00(self.headers, challenge)
@@ -413,12 +457,6 @@ class WebSocketProtocol(ProtocolWrapper):
                     # Start sending frames, and kick any pending frames.
                     self.state = FRAMES
                     self.sendFrames()
-
-            elif self.state == HYBI07:
-                self.sendHyBi07Preamble()
-                log.msg("Completed HyBi-07+ handshake")
-                self.state = FRAMES
-                self.sendFrames()
 
             elif self.state == FRAMES:
                 self.parseFrames()

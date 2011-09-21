@@ -83,7 +83,7 @@ class TestHyBi00(unittest.TestCase):
         frames, buf = parse_hybi00_frames(frame)
 
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], "Test")
+        self.assertEqual(frames[0], (NORMAL, "Test"))
         self.assertEqual(buf, "")
 
     def test_parse_hybi00_multiple(self):
@@ -92,8 +92,8 @@ class TestHyBi00(unittest.TestCase):
         frames, buf = parse_hybi00_frames(frame)
 
         self.assertEqual(len(frames), 2)
-        self.assertEqual(frames[0], "Test")
-        self.assertEqual(frames[1], "Again")
+        self.assertEqual(frames[0], (NORMAL, "Test"))
+        self.assertEqual(frames[1], (NORMAL, "Again"))
         self.assertEqual(buf, "")
 
     def test_parse_hybi00_incomplete(self):
@@ -110,7 +110,7 @@ class TestHyBi00(unittest.TestCase):
         frames, buf = parse_hybi00_frames(frame)
 
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], "Test")
+        self.assertEqual(frames[0], (NORMAL, "Test"))
         self.assertEqual(buf, "")
 
     def test_socketio_crashers(self):
@@ -134,7 +134,7 @@ class TestHyBi00(unittest.TestCase):
             frames, buf = parse_hybi00_frames(prepared)
 
             self.assertEqual(len(frames), 1)
-            self.assertEqual(frames[0], frame)
+            self.assertEqual(frames[0], (NORMAL, frame))
             self.assertEqual(buf, "")
 
 class TestHyBi06Helpers(unittest.TestCase):
@@ -160,7 +160,7 @@ class TestHyBi06Helpers(unittest.TestCase):
         frame = "\x81\x05Hello"
         frames, buf = parse_hybi06_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], ("Hello", NORMAL))
+        self.assertEqual(frames[0], (NORMAL, "Hello"))
         self.assertEqual(buf, "")
 
     def test_parse_hybi06_masked_text(self):
@@ -171,7 +171,7 @@ class TestHyBi06Helpers(unittest.TestCase):
         frame = "\x81\x857\xfa!=\x7f\x9fMQX"
         frames, buf = parse_hybi06_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], ("Hello", NORMAL))
+        self.assertEqual(frames[0], (NORMAL, "Hello"))
         self.assertEqual(buf, "")
 
     def test_parse_hybi06_unmasked_text_fragments(self):
@@ -184,8 +184,8 @@ class TestHyBi06Helpers(unittest.TestCase):
         frame = "\x01\x03Hel\x80\x02lo"
         frames, buf = parse_hybi06_frames(frame)
         self.assertEqual(len(frames), 2)
-        self.assertEqual(frames[0], ("Hel", NORMAL))
-        self.assertEqual(frames[1], ("lo", NORMAL))
+        self.assertEqual(frames[0], (NORMAL, "Hel"))
+        self.assertEqual(frames[1], (NORMAL, "lo"))
         self.assertEqual(buf, "")
 
     def test_parse_hybi06_ping(self):
@@ -196,7 +196,7 @@ class TestHyBi06Helpers(unittest.TestCase):
         frame = "\x89\x05Hello"
         frames, buf = parse_hybi06_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], ("Hello", PING))
+        self.assertEqual(frames[0], (PING, "Hello"))
         self.assertEqual(buf, "")
 
     def test_parse_hybi06_pong(self):
@@ -207,5 +207,5 @@ class TestHyBi06Helpers(unittest.TestCase):
         frame = "\x8a\x05Hello"
         frames, buf = parse_hybi06_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], ("Hello", PONG))
+        self.assertEqual(frames[0], (PONG, "Hello"))
         self.assertEqual(buf, "")
