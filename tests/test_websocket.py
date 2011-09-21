@@ -1,8 +1,8 @@
 from twisted.trial import unittest
 
-from vncap.websocket import (complete_hybi00, make_hybi00_frame,
-                             parse_hybi00_frames, http_headers, make_accept,
-                             mask, NORMAL, PING, PONG, parse_hybi06_frames)
+from txws import (complete_hybi00, make_hybi00_frame, parse_hybi00_frames,
+                  http_headers, make_accept, mask, NORMAL, PING, PONG,
+                  parse_hybi06_frames)
 
 class TestHTTPHeaders(unittest.TestCase):
 
