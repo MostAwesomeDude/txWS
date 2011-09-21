@@ -8,14 +8,40 @@ protocols.
 from base64 import b64encode, b64decode
 from hashlib import md5, sha1
 from string import digits
-from struct import pack
+from struct import pack, unpack
 
 from twisted.internet.interfaces import ISSLTransport
 from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
 from twisted.web.http import datetimeToString
 
+# Flavors of WS supported here.
+# HYBI00 - Hixie-76, HyBi-00. Challenge/response after headers, very minimal
+#          framing. Tricky to start up, but very smooth sailing afterwards.
+# HYBI06 - HyBi-06, HyBi-07. Modern "standard" handshake. Bizarre masked
+#          frames, lots of binary data packing.
+
+HYBI00, HYBI06 = range(2)
+
+# States of the state machine. Because there are no reliable byte counts for
+# any of this, we don't use StatefulProtocol; instead, we use custom state
+# enumerations. Yay!
+
 REQUEST, NEGOTIATING, HYBI00_CHALLENGE, HYBI07, FRAMES = range(5)
+
+# Control frame specifiers. Some versions of WS have control signals sent
+# in-band. Adorable, right?
+
+NORMAL, CLOSE, PING, PONG = range(4)
+
+opcode_types = {
+    0x0: NORMAL,
+    0x1: NORMAL,
+    0x2: NORMAL,
+    0x8: CLOSE,
+    0x9: PING,
+    0xa: PONG,
+}
 
 encoders = {
     "base64": b64encode,
@@ -128,6 +154,79 @@ def parse_hybi00_frames(buf):
 
     # We appear to have hit an exact frame boundary. This is actually pretty
     # likely with a lot of implementations.
+    return frames, buf
+
+def mask(buf, key):
+    """
+    Mask or unmask a buffer of bytes with a masking key.
+
+    The key must be exactly four bytes long.
+    """
+
+    # This is super-secure, I promise~
+    key = [ord(i) for i in key]
+    buf = list(buf)
+    for i, char in enumerate(buf):
+        buf[i] = chr(ord(char) ^ key[i % 4])
+    return "".join(buf)
+
+def parse_hybi06_frames(buf):
+    """
+    Parse HyBi-06 frames in a highly compliant manner.
+
+    This function requires *complete* frames and does highly bogus things if
+    fed incomplete frames.
+    """
+
+    frames = []
+
+    while buf:
+        # Grab the header. This single byte holds some flags nobody cares
+        # about, and an opcode which nobody cares about.
+        header, buf = ord(buf[0]), buf[1:]
+        if header & 0x70:
+            # At least one of the reserved flags is set. Pork chop sandwiches!
+            raise Exception("Reserved flag in HyBi-06 frame (%d)" % header)
+            frames.append(("", CLOSE))
+            return frames, buf
+
+        # Get the opcode, and translate it to a local enum which we actually
+        # care about.
+        opcode = header & 0xf
+        try:
+            opcode = opcode_types[opcode]
+        except KeyError:
+            raise Exception("Unknown opcode %d in HyBi-06 frame!" % opcode)
+
+        # Get the payload length and determine whether we need to look for an
+        # extra length.
+        length, buf = ord(buf[0]), buf[1:]
+        masked = length & 0x80
+        length &= 0x7f
+
+        # Extra length fields.
+        if length == 0x7e:
+            length, buf = buf[:4], buf[4:]
+            length = unpack(">H", length)[0]
+        elif length == 0x7f:
+            # Protocol bug: The top bit of this long long *must* be cleared;
+            # that is, it is expected to be interpreted as signed. That's
+            # fucking stupid, if you don't mind me saying so, and so we're
+            # interpreting it as unsigned anyway. If you wanna send exabytes
+            # of data down the wire, then go ahead!
+            length, buf = buf[:8], buf[8:]
+            length = unpack(">Q", length)[0]
+
+        if masked:
+            key, buf = buf[:4], buf[4:]
+
+        data, buf = buf[:length], buf[length:]
+
+        if masked:
+            data = mask(data, key)
+
+        frames.append((data, opcode))
+
     return frames, buf
 
 class WebSocketProtocol(ProtocolWrapper):
