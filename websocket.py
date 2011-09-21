@@ -325,16 +325,16 @@ class WebSocketProtocol(ProtocolWrapper):
         frames, self.buf = parser(self.buf)
 
         for frame in frames:
-            opcode = frame[0]
+            opcode, data = frame
             if opcode == NORMAL:
                 # Business as usual. Decode the frame, if we have a decoder.
                 if self.codec:
-                    frame = decoders[self.codec](frame)
+                    data = decoders[self.codec](data)
                 # Pass the frame to the underlying protocol.
-                ProtocolWrapper.dataReceived(self, frame)
+                ProtocolWrapper.dataReceived(self, data)
             elif opcode == CLOSE:
                 # The other side wants us to close. I wonder why?
-                reason, text = frame[1]
+                reason, text = data
                 log.msg("Closing connection: %r (%d)" % (text, reason))
 
                 # Send the smallest possible closing message.
