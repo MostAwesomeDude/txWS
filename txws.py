@@ -306,9 +306,10 @@ class WebSocketProtocol(ProtocolWrapper):
         """
 
         self.sendCommonPreamble()
+        challenge = self.headers["Sec-WebSocket-Key"]
+        response = make_accept(challenge)
 
-        self.transport.write("Sec-WebSocket-Accept: %s\r\n\r\n" %
-                             make_accept(self.headers))
+        self.transport.write("Sec-WebSocket-Accept: %s\r\n\r\n" % response)
 
     def parseFrames(self):
         """
