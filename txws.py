@@ -173,10 +173,21 @@ def mask(buf, key):
 def make_hybi07_frame(buf):
     """
     Make a HyBi-07 frame.
+
+    This function always creates unmasked frames, and attempts to use the
+    smallest possible lengths.
     """
 
-    # XXX next commit
-    return None
+    if len(buf) > 0xffff:
+        length = "\x7f%s" % pack(">Q", len(buf))
+    elif len(buf) > 0x7d:
+        length = "\x7e%s" % pack(">H", len(buf))
+    else:
+        length = chr(len(buf))
+
+    # Always make a normal packet.
+    frame = "\x81%s%s" % (length, buf)
+    return frame
 
 def parse_hybi07_frames(buf):
     """
