@@ -430,8 +430,6 @@ class WebSocketProtocol(ProtocolWrapper):
     def dataReceived(self, data):
         self.buf += data
 
-        log.msg("Got data, buffer is %r" % self.buf)
-
         oldstate = None
 
         while oldstate != self.state:
