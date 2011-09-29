@@ -20,8 +20,10 @@ from twisted.web.http import datetimeToString
 #          framing. Tricky to start up, but very smooth sailing afterwards.
 # HYBI07 - HyBi-07. Modern "standard" handshake. Bizarre masked frames, lots
 #          of binary data packing.
+# HYBI10 - HyBi-10. Just like HyBi-07. No, seriously. *Exactly* the same,
+#          except for the protocol number.
 
-HYBI00, HYBI07 = range(2)
+HYBI00, HYBI07, HYBI10 = range(3)
 
 # States of the state machine. Because there are no reliable byte counts for
 # any of this, we don't use StatefulProtocol; instead, we use custom state
@@ -329,7 +331,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
         if self.flavor == HYBI00:
             parser = parse_hybi00_frames
-        elif self.flavor == HYBI07:
+        elif self.flavor in (HYBI07, HYBI10):
             parser = parse_hybi07_frames
         else:
             raise Exception("Unknown flavor %r!" % self.flavor)
@@ -363,7 +365,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
         if self.flavor == HYBI00:
             maker = make_hybi00_frame
-        elif self.flavor == HYBI07:
+        elif self.flavor in (HYBI07, HYBI10):
             maker = make_hybi07_frame
         else:
             raise Exception("Unknown flavor %r!" % self.flavor)
@@ -420,6 +422,11 @@ class WebSocketProtocol(ProtocolWrapper):
                 log.msg("Starting HyBi-07 conversation")
                 self.sendHyBi07Preamble()
                 self.flavor = HYBI07
+                self.state = FRAMES
+            elif version == "8":
+                log.msg("Starting HyBi-10 conversation")
+                self.sendHyBi07Preamble()
+                self.flavor = HYBI10
                 self.state = FRAMES
             else:
                 log.msg("Can't support protocol version %s!" % version)
