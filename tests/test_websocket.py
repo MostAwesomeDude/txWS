@@ -1,7 +1,7 @@
 from twisted.trial import unittest
 
 from txws import (complete_hybi00, make_hybi00_frame, parse_hybi00_frames,
-                  http_headers, make_accept, mask, NORMAL, PING, PONG,
+                  http_headers, make_accept, mask, CLOSE, NORMAL, PING, PONG,
                   parse_hybi07_frames)
 
 class TestHTTPHeaders(unittest.TestCase):
@@ -208,4 +208,29 @@ class TestHyBi07Helpers(unittest.TestCase):
         frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
         self.assertEqual(frames[0], (PONG, "Hello"))
+        self.assertEqual(buf, "")
+
+    def test_parse_hybi07_close_empty(self):
+        """
+        A HyBi-07 close packet may have no body. In that case, it should use
+        the generic error code 1000, and have no reason.
+        """
+
+        frame = "\x88\x00"
+        frames, buf = parse_hybi07_frames(frame)
+        self.assertEqual(len(frames), 1)
+        self.assertEqual(frames[0], (CLOSE, (1000, "No reason given")))
+        self.assertEqual(buf, "")
+
+    def test_parse_hybi07_close_reason(self):
+        """
+        A HyBi-07 close packet must have its first two bytes be a numeric
+        error code, and may optionally include trailing text explaining why
+        the connection was closed.
+        """
+
+        frame = "\x88\x0b\x03\xe8No reason"
+        frames, buf = parse_hybi07_frames(frame)
+        self.assertEqual(len(frames), 1)
+        self.assertEqual(frames[0], (CLOSE, (1000, "No reason")))
         self.assertEqual(buf, "")

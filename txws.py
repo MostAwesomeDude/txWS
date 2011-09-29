@@ -247,8 +247,12 @@ def parse_hybi07_frames(buf):
             data = mask(data, key)
 
         if opcode == CLOSE:
-            # Gotta unpack the opcode and return usable data here.
-            data = unpack(">H", data[:2])[0], data[2:]
+            if len(data) >= 2:
+                # Gotta unpack the opcode and return usable data here.
+                data = unpack(">H", data[:2])[0], data[2:]
+            else:
+                # No reason given; use generic data.
+                data = 1000, "No reason given"
 
         frames.append((opcode, data))
 
