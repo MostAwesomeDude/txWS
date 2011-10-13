@@ -11,7 +11,6 @@ Usage
 Use ``txws.WebSocketFactory`` to wrap your factories. That's it! Adding
 WebSockets support has never been easier.
 
-::
     >>> from txws import WebSocketFactory
     >>> reactor.listenTCP(8080, WebSocketFactory(factory_to_wrap))
 
@@ -21,11 +20,16 @@ Versions
 txWS supports the following versions of the WebSockets draft:
 
  * Version 76
+
    * Hixie-76
    * HyBi-00
+
  * Version 7
+
    * HyBi-07
+
  * Version 8
+
    * HyBi-08
 
 In case you're wondering, the version numbers above are correct; WebSockets
