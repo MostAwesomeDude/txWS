@@ -141,21 +141,23 @@ def parse_hybi00_frames(buf):
     """
 
     start = buf.find("\x00")
+    tail = 0
     frames = []
 
     while start != -1:
-        end = buf.find("\xff")
+        end = buf.find("\xff", start + 1)
         if end == -1:
             # Incomplete frame, try again later.
-            return frames, buf
+            break
         else:
-            frame, buf = buf[start + 1:end], buf[end + 1:]
             # Found a frame, put it in the list.
+            frame = buf[start + 1:end]
             frames.append((NORMAL, frame))
-        start = buf.find("\x00")
+            tail = end + 1
+        start = buf.find("\x00", end + 1)
 
-    # We appear to have hit an exact frame boundary. This is actually pretty
-    # likely with a lot of implementations.
+    # Adjust the buffer and return.
+    buf = buf[tail:]
     return frames, buf
 
 def mask(buf, key):
