@@ -480,12 +480,19 @@ class WebSocketProtocol(ProtocolWrapper):
                     self.sendHyBi00Preamble()
                     self.transport.write(response)
                     log.msg("Completed HyBi-00/Hixie-76 handshake")
-                    # Start sending frames, and kick any pending frames.
+                    # We're all finished here; start sending frames.
                     self.state = FRAMES
-                    self.sendFrames()
 
             elif self.state == FRAMES:
                 self.parseFrames()
+
+        # Kick any pending frames. This is needed because frames might have
+        # started piling up early; we can get write()s from our protocol above
+        # when they makeConnection() immediately, before our browser client
+        # actually sends any data. In those cases, we need to manually kick
+        # pending frames.
+        if self.pending_frames:
+            self.sendFrames()
 
     def write(self, data):
         """
