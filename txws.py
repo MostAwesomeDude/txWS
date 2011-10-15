@@ -196,17 +196,19 @@ def make_hybi07_frame(buf):
 def parse_hybi07_frames(buf):
     """
     Parse HyBi-07 frames in a highly compliant manner.
-
-    This function requires *complete* frames and does highly bogus things if
-    fed incomplete frames.
     """
 
+    start = 0
     frames = []
 
-    while buf:
+    while True:
+        # If there's not at least two bytes in the buffer, bail.
+        if len(buf) - start < 2:
+            break
+
         # Grab the header. This single byte holds some flags nobody cares
         # about, and an opcode which nobody cares about.
-        header, buf = ord(buf[0]), buf[1:]
+        header = ord(buf[start])
         if header & 0x70:
             # At least one of the reserved flags is set. Pork chop sandwiches!
             raise Exception("Reserved flag in HyBi-07 frame (%d)" % header)
@@ -223,27 +225,47 @@ def parse_hybi07_frames(buf):
 
         # Get the payload length and determine whether we need to look for an
         # extra length.
-        length, buf = ord(buf[0]), buf[1:]
+        length = ord(buf[start + 1])
         masked = length & 0x80
         length &= 0x7f
 
+        # The offset we're gonna be using to walk through the frame. We use
+        # this because the offset is variable depending on the length and
+        # mask.
+        offset = 2
+
         # Extra length fields.
         if length == 0x7e:
-            length, buf = buf[:4], buf[4:]
+            if len(buf) - start < 4:
+                break
+
+            length = buf[start + 2:start + 4]
             length = unpack(">H", length)[0]
+            offset += 2
         elif length == 0x7f:
+            if len(buf) - start < 10:
+                break
+
             # Protocol bug: The top bit of this long long *must* be cleared;
             # that is, it is expected to be interpreted as signed. That's
             # fucking stupid, if you don't mind me saying so, and so we're
             # interpreting it as unsigned anyway. If you wanna send exabytes
             # of data down the wire, then go ahead!
-            length, buf = buf[:8], buf[8:]
+            length = buf[start + 2:start + 10]
             length = unpack(">Q", length)[0]
+            offset += 8
 
         if masked:
-            key, buf = buf[:4], buf[4:]
+            if len(buf) - (start + offset) < 4:
+                break
 
-        data, buf = buf[:length], buf[length:]
+            key = buf[start + offset:start + offset + 4]
+            offset += 4
+
+        if len(buf) - (start + offset) < length:
+            break
+
+        data = buf[start + offset:start + offset + length]
 
         if masked:
             data = mask(data, key)
@@ -257,8 +279,9 @@ def parse_hybi07_frames(buf):
                 data = 1000, "No reason given"
 
         frames.append((opcode, data))
+        start += offset + length
 
-    return frames, buf
+    return frames, buf[start:]
 
 class WebSocketProtocol(ProtocolWrapper):
     """
