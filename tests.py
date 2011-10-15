@@ -234,3 +234,33 @@ class TestHyBi07Helpers(unittest.TestCase):
         self.assertEqual(len(frames), 1)
         self.assertEqual(frames[0], (CLOSE, (1000, "No reason")))
         self.assertEqual(buf, "")
+
+    def test_parse_hybi07_partial_no_length(self):
+        frame = "\x81"
+        frames, buf = parse_hybi07_frames(frame)
+        self.assertFalse(frames)
+        self.assertEqual(buf, "\x81")
+
+    def test_parse_hybi07_partial_truncated_length_int(self):
+        frame = "\x81\xfe"
+        frames, buf = parse_hybi07_frames(frame)
+        self.assertFalse(frames)
+        self.assertEqual(buf, "\x81\xfe")
+
+    def test_parse_hybi07_partial_truncated_length_double(self):
+        frame = "\x81\xff"
+        frames, buf = parse_hybi07_frames(frame)
+        self.assertFalse(frames)
+        self.assertEqual(buf, "\x81\xff")
+
+    def test_parse_hybi07_partial_no_data(self):
+        frame = "\x81\x05"
+        frames, buf = parse_hybi07_frames(frame)
+        self.assertFalse(frames)
+        self.assertEqual(buf, "\x81\x05")
+
+    def test_parse_hybi07_partial_truncated_data(self):
+        frame = "\x81\x05Hel"
+        frames, buf = parse_hybi07_frames(frame)
+        self.assertFalse(frames)
+        self.assertEqual(buf, "\x81\x05Hel")
