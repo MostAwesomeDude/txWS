@@ -15,6 +15,14 @@ from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
 from twisted.web.http import datetimeToString
 
+class WSException(Exception):
+    """
+    Something stupid happened here.
+
+    If this class escapes txWS, then something stupid happened in multiple
+    places.
+    """
+
 # Flavors of WS supported here.
 # HYBI00 - Hixie-76, HyBi-00. Challenge/response after headers, very minimal
 #          framing. Tricky to start up, but very smooth sailing afterwards.
@@ -174,7 +182,7 @@ def mask(buf, key):
         buf[i] = chr(ord(char) ^ key[i % 4])
     return "".join(buf)
 
-def make_hybi07_frame(buf):
+def make_hybi07_frame(buf, opcode=0x1):
     """
     Make a HyBi-07 frame.
 
@@ -190,7 +198,8 @@ def make_hybi07_frame(buf):
         length = chr(len(buf))
 
     # Always make a normal packet.
-    frame = "\x81%s%s" % (length, buf)
+    header = chr(0x80 | opcode)
+    frame = "%s%s%s" % (header, length, buf)
     return frame
 
 def parse_hybi07_frames(buf):
@@ -211,7 +220,7 @@ def parse_hybi07_frames(buf):
         header = ord(buf[start])
         if header & 0x70:
             # At least one of the reserved flags is set. Pork chop sandwiches!
-            raise Exception("Reserved flag in HyBi-07 frame (%d)" % header)
+            raise WSException("Reserved flag in HyBi-07 frame (%d)" % header)
             frames.append(("", CLOSE))
             return frames, buf
 
@@ -221,7 +230,7 @@ def parse_hybi07_frames(buf):
         try:
             opcode = opcode_types[opcode]
         except KeyError:
-            raise Exception("Unknown opcode %d in HyBi-07 frame!" % opcode)
+            raise WSException("Unknown opcode %d in HyBi-07 frame" % opcode)
 
         # Get the payload length and determine whether we need to look for an
         # extra length.
@@ -363,9 +372,14 @@ class WebSocketProtocol(ProtocolWrapper):
         elif self.flavor in (HYBI07, HYBI10):
             parser = parse_hybi07_frames
         else:
-            raise Exception("Unknown flavor %r!" % self.flavor)
+            raise WSException("Unknown flavor %r" % self.flavor)
 
-        frames, self.buf = parser(self.buf)
+        try:
+            frames, self.buf = parser(self.buf)
+        except WSException, wse:
+            # Couldn't parse all the frames, something went wrong, let's bail.
+            self.close(wse.args[0])
+            return
 
         for frame in frames:
             opcode, data = frame
@@ -380,9 +394,8 @@ class WebSocketProtocol(ProtocolWrapper):
                 reason, text = data
                 log.msg("Closing connection: %r (%d)" % (text, reason))
 
-                # Send the smallest possible closing message.
-                # XXX totally protocol-7 specific
-                self.transport.write("\x88\x00")
+                # Close the connection.
+                self.close()
 
     def sendFrames(self):
         """
@@ -397,7 +410,7 @@ class WebSocketProtocol(ProtocolWrapper):
         elif self.flavor in (HYBI07, HYBI10):
             maker = make_hybi07_frame
         else:
-            raise Exception("Unknown flavor %r!" % self.flavor)
+            raise WSException("Unknown flavor %r" % self.flavor)
 
         for frame in self.pending_frames:
             # Encode the frame before sending it.
@@ -528,6 +541,24 @@ class WebSocketProtocol(ProtocolWrapper):
 
         self.pending_frames.append(data)
         self.sendFrames()
+
+    def close(self, reason=""):
+        """
+        Close the connection.
+
+        This includes telling the other side we're closing the connection.
+
+        If the other side didn't signal that the connection is being closed,
+        then we might not see their last message, but since their last message
+        should, according to the spec, be a simple acknowledgement, it
+        shouldn't be a problem.
+        """
+
+        if self.flavor in (HYBI07, HYBI10):
+            frame = make_hybi07_frame(reason, opcode=0x8)
+            self.transport.write(frame)
+
+        self.loseConnection()
 
 class WebSocketFactory(WrappingFactory):
     """
