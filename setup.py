@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="txWS",
-    version="0.6.1",
+    version="0.6.2",
     py_modules=["txws"],
     install_requires=[
         "Twisted",
