@@ -1,8 +1,8 @@
 from twisted.trial import unittest
 
-from txws import (complete_hybi00, make_hybi00_frame, parse_hybi00_frames,
-                  http_headers, make_accept, mask, CLOSE, NORMAL, PING, PONG,
-                  parse_hybi07_frames)
+from txws import (is_hybi00, complete_hybi00, make_hybi00_frame,
+                  parse_hybi00_frames, http_headers, make_accept, mask, CLOSE,
+                  NORMAL, PING, PONG, parse_hybi07_frames)
 
 class TestHTTPHeaders(unittest.TestCase):
 
@@ -54,6 +54,19 @@ class TestKeys(unittest.TestCase):
         self.assertEqual(make_accept(key), "HSmrc0sMlYUkAGmm5OPpG2HaGWk=")
 
 class TestHyBi00(unittest.TestCase):
+
+    def test_is_hybi00(self):
+        headers = {
+            "Sec-WebSocket-Key1": "hurp",
+            "Sec-WebSocket-Key2": "derp",
+        }
+        self.assertTrue(is_hybi00(headers))
+
+    def test_is_hybi00_false(self):
+        headers = {
+            "Sec-WebSocket-Key1": "hurp",
+        }
+        self.assertFalse(is_hybi00(headers))
 
     def test_complete_hybi00_wikipedia(self):
         """
