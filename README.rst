@@ -14,6 +14,10 @@ WebSockets support has never been easier.
     >>> from txws import WebSocketFactory
     >>> reactor.listenTCP(8080, WebSocketFactory(factory_to_wrap))
 
+There is no extra trick to txWS. There is no special setup involved.
+
+Do you want secure WebSockets? Use ``listenSSL()`` instead of ``listenTCP()``.
+
 Versions
 ========
 
