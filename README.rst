@@ -65,3 +65,11 @@ However, Autobahn doesn't provide support for WS version 76, and requires
 clients to subclass their factories and protocols in order to provide WS
 functionality. txWS uses a compositional approach with wrapped protocols,
 allowing completely transparent reuse of existing protocols and factories.
+
+Cyclone
+-------
+
+Cyclone provides a simple WebSockets handler. This handler can do WS versions
+75 and 76. The Cyclone WebSockets handler is very limited, can only wrap other
+Cyclone handlers, and doesn't support any of the more modern WebSockets
+versions.
