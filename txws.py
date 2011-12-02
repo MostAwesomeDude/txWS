@@ -544,6 +544,16 @@ class WebSocketProtocol(ProtocolWrapper):
         self.pending_frames.append(data)
         self.sendFrames()
 
+    def writeSequence(self, data):
+        """
+        Write a sequence of data to the transport.
+
+        This method will only be called by the underlying protocol.
+        """
+
+        self.pending_frames.extend(data)
+        self.sendFrames()
+
     def close(self, reason=""):
         """
         Close the connection.
