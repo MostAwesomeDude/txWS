@@ -1,3 +1,8 @@
+next
+====
+
+* Fix ITransport.writeSequence() implementation (#3)
+
 0.6.2
 =====
 
