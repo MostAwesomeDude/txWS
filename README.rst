@@ -73,3 +73,9 @@ Cyclone provides a simple WebSockets handler. This handler can do WS versions
 75 and 76. The Cyclone WebSockets handler is very limited, can only wrap other
 Cyclone handlers, and doesn't support any of the more modern WebSockets
 versions.
+
+License
+=======
+
+txWS is © 2011 Oregon State University Open Source Lab and is made available
+under the MIT license.
