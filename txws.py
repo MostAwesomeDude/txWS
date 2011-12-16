@@ -44,14 +44,16 @@ class WSException(Exception):
     """
 
 # Flavors of WS supported here.
-# HYBI00 - Hixie-76, HyBi-00. Challenge/response after headers, very minimal
-#          framing. Tricky to start up, but very smooth sailing afterwards.
-# HYBI07 - HyBi-07. Modern "standard" handshake. Bizarre masked frames, lots
-#          of binary data packing.
-# HYBI10 - HyBi-10. Just like HyBi-07. No, seriously. *Exactly* the same,
-#          except for the protocol number.
+# HYBI00  - Hixie-76, HyBi-00. Challenge/response after headers, very minimal
+#           framing. Tricky to start up, but very smooth sailing afterwards.
+# HYBI07  - HyBi-07. Modern "standard" handshake. Bizarre masked frames, lots
+#           of binary data packing.
+# HYBI10  - HyBi-10. Just like HyBi-07. No, seriously. *Exactly* the same,
+#           except for the protocol number.
+# RFC6455 - RFC 6455. The official WebSocket protocol standard. The protocol
+#           number is 13, but otherwise it is identical to HyBi-07.
 
-HYBI00, HYBI07, HYBI10 = range(3)
+HYBI00, HYBI07, HYBI10, RFC6455 = range(4)
 
 # States of the state machine. Because there are no reliable byte counts for
 # any of this, we don't use StatefulProtocol; instead, we use custom state
@@ -389,7 +391,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
         if self.flavor == HYBI00:
             parser = parse_hybi00_frames
-        elif self.flavor in (HYBI07, HYBI10):
+        elif self.flavor in (HYBI07, HYBI10, RFC6455):
             parser = parse_hybi07_frames
         else:
             raise WSException("Unknown flavor %r" % self.flavor)
@@ -427,7 +429,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
         if self.flavor == HYBI00:
             maker = make_hybi00_frame
-        elif self.flavor in (HYBI07, HYBI10):
+        elif self.flavor in (HYBI07, HYBI10, RFC6455):
             maker = make_hybi07_frame
         else:
             raise WSException("Unknown flavor %r" % self.flavor)
@@ -489,6 +491,11 @@ class WebSocketProtocol(ProtocolWrapper):
                 log.msg("Starting HyBi-10 conversation")
                 self.sendHyBi07Preamble()
                 self.flavor = HYBI10
+                self.state = FRAMES
+            elif version == "13":
+                log.msg("Starting RFC 6455 conversation")
+                self.sendHyBi07Preamble()
+                self.flavor = RFC6455
                 self.state = FRAMES
             else:
                 log.msg("Can't support protocol version %s!" % version)
@@ -584,7 +591,9 @@ class WebSocketProtocol(ProtocolWrapper):
         shouldn't be a problem.
         """
 
-        if self.flavor in (HYBI07, HYBI10):
+        # Send a closing frame. It's only polite. (And might keep the browser
+        # from hanging.)
+        if self.flavor in (HYBI07, HYBI10, RFC6455):
             frame = make_hybi07_frame(reason, opcode=0x8)
             self.transport.write(frame)
 

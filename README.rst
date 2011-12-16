@@ -25,16 +25,21 @@ txWS supports the following versions of the WebSockets draft:
 
  * Version 76
 
-   * Hixie-76
+   * Hixie-76 (Chrome 6, Fx 4, Opera 11, Safari 5)
    * HyBi-00
 
  * Version 7
 
-   * HyBi-07
+   * HyBi-07 (Fx 6)
 
  * Version 8
 
    * HyBi-08
+   * HyBi-10 (Chrome 14, Chrome 15, Fx 7, Fx 8)
+
+ * Version 13
+
+   * RFC 6455 (Chrome 16)
 
 In case you're wondering, the version numbers above are correct; WebSockets
 versioning is not sane.
