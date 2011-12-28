@@ -1,7 +1,8 @@
-next
-====
+0.7
+===
 
 * Fix ITransport.writeSequence() implementation (#3)
+* Add RFC 6455 (Chrome 16) support (#4)
 
 0.6.2
 =====
