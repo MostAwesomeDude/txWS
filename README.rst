@@ -3,7 +3,7 @@ txWS
 ====
 
 txWS (prounounced "Twisted WebSockets") is a small, short, simple library for
-adding WebSockets support to your favorite Twisted applications.
+adding WebSockets server support to your favorite Twisted applications.
 
 Usage
 =====
@@ -25,7 +25,7 @@ txWS supports the following versions of the WebSockets draft:
 
  * Version 76
 
-   * Hixie-76 (Chrome 6, Fx 4, Opera 11, Safari 5)
+   * Hixie-76 (Chrome 6, Fx 4, Opera 11, **UNTESTED** Safari 5)
    * HyBi-00
 
  * Version 7
@@ -41,8 +41,23 @@ txWS supports the following versions of the WebSockets draft:
 
    * RFC 6455 (Chrome 16)
 
+All listed browser versions have been tested and verified working; any browser
+marked "UNTESTED" hasn't been personally tested, but has been reported working
+by third parties.
+
 In case you're wondering, the version numbers above are correct; WebSockets
 versioning is not sane.
+
+Browser Quirks
+==============
+
+This might save you some time when developing your WebSockets-based
+application.
+
+ * Firefox (all versions): WebSockets do not follow the standard WebSocket
+   API.
+ * Opera 11: WebSockets are disabled by default and are very slow to close
+   connections.
 
 Comparisons
 ===========
@@ -82,5 +97,5 @@ versions.
 License
 =======
 
-txWS is © 2011 Oregon State University Open Source Lab and is made available
+txWS is (c) 2011 Oregon State University Open Source Lab and is made available
 under the MIT license.
