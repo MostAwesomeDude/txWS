@@ -2,7 +2,7 @@
 txWS
 ====
 
-txWS (prounounced "Twisted WebSockets") is a small, short, simple library for
+txWS (pronounced "Twisted WebSockets") is a small, short, simple library for
 adding WebSockets server support to your favorite Twisted applications.
 
 Usage
