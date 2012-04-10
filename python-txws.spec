@@ -2,7 +2,7 @@
 
 Name:             python-txws
 Version:          0.7
-Release:          1%{?dist}
+Release:          2%{?dist}
 Summary:          Twisted WebSockets wrapper
 
 Group:            Development/Languages
@@ -43,5 +43,8 @@ for adding WebSockets server support to your favorite Twisted applications.
 %{python_sitelib}/* 
 
 %changelog
+* Mon Apr 09 2012 Ralph Bean <rbean@redhat.com> 0.7-2
+- Fixed spelling error in the specfile description.
+
 * Thu Apr 05 2012 Ralph Bean <rbean@redhat.com>  0.7-1
 - initial package for Fedora
