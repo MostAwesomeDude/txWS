@@ -23,7 +23,7 @@ Blind reimplementation of WebSockets as a standalone wrapper for Twisted
 protocols.
 """
 
-__version__ = "0.6.2"
+__version__ = "0.7.1"
 
 from base64 import b64encode, b64decode
 from hashlib import md5, sha1
