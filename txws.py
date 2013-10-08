@@ -378,11 +378,22 @@ class WebSocketProtocol(ProtocolWrapper):
         Send a HyBi-07 preamble.
         """
 
+        protocol = "wss" if self.isSecure() else "ws"
+
         self.sendCommonPreamble()
+
         challenge = self.headers["Sec-WebSocket-Key"]
         response = make_accept(challenge)
 
-        self.transport.write("Sec-WebSocket-Accept: %s\r\n\r\n" % response)
+        self.transport.writeSequence([
+            "Sec-WebSocket-Origin: %s\r\n" % self.origin,
+            "Sec-WebSocket-Location: %s://%s%s\r\n" % (protocol, self.host,
+                                                       self.location),
+            "WebSocket-Protocol: %s\r\n" % self.codec,
+            "Sec-WebSocket-Protocol: %s\r\n" % self.codec,
+            "Sec-WebSocket-Accept: %s\r\n" % response,
+            "\r\n",
+        ])
 
     def parseFrames(self):
         """
