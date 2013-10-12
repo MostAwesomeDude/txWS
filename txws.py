@@ -107,7 +107,7 @@ def is_websocket(headers):
     Determine whether a given set of headers is asking for WebSockets.
     """
 
-    return ("Upgrade" in headers.get("Connection", "")
+    return ("upgrade" in headers.get("Connection", "").lower()
             and headers.get("Upgrade").lower() == "websocket")
 
 def is_hybi00(headers):
