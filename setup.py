@@ -4,11 +4,9 @@ from setuptools import setup
 
 setup(
     name="txWS",
-    version="0.7.1",
     py_modules=["txws"],
-    install_requires=[
-        "Twisted",
-    ],
+    setup_requires=["vcversioner"],
+    vcversioner={},
     author="Corbin Simpson",
     author_email="simpsoco@osuosl.org",
     description="Twisted WebSockets wrapper",
