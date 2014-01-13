@@ -485,18 +485,28 @@ class WebSocketProtocol(ProtocolWrapper):
             self.origin = self.headers["Origin"]
 
         # Check whether a codec is needed. WS calls this a "protocol" for
-        # reasons I cannot fathom.
-        protocol = None
+        # reasons I cannot fathom. Newer versions of noVNC (0.4+) sets
+        # multiple comma-separated codecs, handle this by chosing first one
+        # we can encode/decode.
+        protocols = None
         if "WebSocket-Protocol" in self.headers:
-            protocol = self.headers["WebSocket-Protocol"]
+            protocols = self.headers["WebSocket-Protocol"]
         elif "Sec-WebSocket-Protocol" in self.headers:
-            protocol = self.headers["Sec-WebSocket-Protocol"]
+            protocols = self.headers["Sec-WebSocket-Protocol"]
 
-        if protocol:
-            if protocol not in encoders or protocol not in decoders:
+        if isinstance(protocols, basestring):
+            protocols = [p.strip() for p in protocols.split(',')]
+
+            for protocol in protocols:
+                if protocol in encoders or protocol in decoders:
+                    log.msg("Using WS protocol %s!" % protocol)
+                    self.codec = protocol
+                    break
+
                 log.msg("Couldn't handle WS protocol %s!" % protocol)
+
+            if not self.codec:
                 return False
-            self.codec = protocol
 
         # Start the next phase of the handshake for HyBi-00.
         if is_hybi00(self.headers):
