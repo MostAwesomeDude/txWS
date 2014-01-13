@@ -1,3 +1,9 @@
+0.8
+===
+
+* Add binary message support (#15, #19)
+* Negotiate multiple subprotocols (#21)
+
 0.7
 ===
 
