@@ -224,6 +224,19 @@ def make_hybi07_frame(buf, opcode=0x1):
     frame = "%s%s%s" % (header, length, buf)
     return frame
 
+def make_hybi07_frame_dwim(buf):
+    """
+    Make a HyBi-07 frame with binary or text data according to the type of buf.
+    """
+    
+    # TODO: eliminate magic numbers.
+    if isinstance(buf, str):
+        return make_hybi07_frame(buf, opcode=0x2)
+    elif isinstance(buf, unicode):
+        return make_hybi07_frame(buf.encode("utf-8"), opcode=0x1)
+    else:
+        raise TypeError("In binary support mode, frame data must be either str or unicode")
+
 def parse_hybi07_frames(buf):
     """
     Parse HyBi-07 frames in a highly compliant manner.
@@ -327,10 +340,19 @@ class WebSocketProtocol(ProtocolWrapper):
     origin = "http://example.com"
     state = REQUEST
     flavor = None
+    do_binary_frames = False
 
     def __init__(self, *args, **kwargs):
         ProtocolWrapper.__init__(self, *args, **kwargs)
         self.pending_frames = []
+
+    def setBinaryMode(self, mode):
+        """
+        If True, send str as binary and unicode as text.
+        
+        Defaults to false for backwards compatibility.
+        """
+        self.do_binary_frames = bool(mode)
 
     def isSecure(self):
         """
@@ -430,7 +452,10 @@ class WebSocketProtocol(ProtocolWrapper):
         if self.flavor == HYBI00:
             maker = make_hybi00_frame
         elif self.flavor in (HYBI07, HYBI10, RFC6455):
-            maker = make_hybi07_frame
+            if self.do_binary_frames:
+                maker = make_hybi07_frame_dwim
+            else:
+                maker = make_hybi07_frame
         else:
             raise WSException("Unknown flavor %r" % self.flavor)
 
