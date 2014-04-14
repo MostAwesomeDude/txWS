@@ -25,6 +25,8 @@ protocols.
 
 __version__ = "0.7.1"
 
+import six
+
 from base64 import b64encode, b64decode
 from hashlib import md5, sha1
 from string import digits
@@ -146,7 +148,10 @@ def make_accept(key):
 
     guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-    return sha1("%s%s" % (key, guid)).digest().encode("base64").strip()
+    accept = "%s%s" % (key, guid)
+    hashed_bytes = sha1(accept.encode('utf-8')).digest()
+
+    return b64encode(hashed_bytes).strip().decode('utf-8')
 
 # Frame helpers.
 # Separated out to make unit testing a lot easier.
@@ -228,11 +233,11 @@ def make_hybi07_frame_dwim(buf):
     """
     Make a HyBi-07 frame with binary or text data according to the type of buf.
     """
-    
+
     # TODO: eliminate magic numbers.
-    if isinstance(buf, str):
+    if isinstance(buf, six.binary_type):
         return make_hybi07_frame(buf, opcode=0x2)
-    elif isinstance(buf, unicode):
+    elif isinstance(buf, six.text_type):
         return make_hybi07_frame(buf.encode("utf-8"), opcode=0x1)
     else:
         raise TypeError("In binary support mode, frame data must be either str or unicode")
@@ -420,7 +425,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
         try:
             frames, self.buf = parser(self.buf)
-        except WSException, wse:
+        except WSException as wse:
             # Couldn't parse all the frames, something went wrong, let's bail.
             self.close(wse.args[0])
             return
@@ -494,7 +499,7 @@ class WebSocketProtocol(ProtocolWrapper):
         elif "Sec-WebSocket-Protocol" in self.headers:
             protocols = self.headers["Sec-WebSocket-Protocol"]
 
-        if isinstance(protocols, basestring):
+        if isinstance(protocols, six.string_types):
             protocols = [p.strip() for p in protocols.split(',')]
 
             for protocol in protocols:
