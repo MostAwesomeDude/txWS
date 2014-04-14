@@ -135,7 +135,11 @@ def complete_hybi00(headers, challenge):
     first = int("".join(i for i in key1 if i in digits)) / key1.count(" ")
     second = int("".join(i for i in key2 if i in digits)) / key2.count(" ")
 
-    nonce = pack(">II8s", first, second, challenge)
+    # In python3, division of ints doesn't return an int, so we have to...
+    first = int(first)
+    second = int(second)
+
+    nonce = pack(">II8s", first, second, six.b(challenge))
 
     return md5(nonce).digest()
 
@@ -322,7 +326,7 @@ def parse_hybi07_frames(buf):
         if opcode == CLOSE:
             if len(data) >= 2:
                 # Gotta unpack the opcode and return usable data here.
-                data = unpack(">H", data[:2])[0], data[2:]
+                data = unpack(">H", six.b(data[:2]))[0], data[2:]
             else:
                 # No reason given; use generic data.
                 data = 1000, "No reason given"

@@ -1,3 +1,4 @@
+import six
 from twisted.trial import unittest
 
 from txws import (is_hybi00, complete_hybi00, make_hybi00_frame,
@@ -81,7 +82,7 @@ class TestHyBi00(unittest.TestCase):
         challenge = "^n:ds[4U"
 
         self.assertEqual(complete_hybi00(headers, challenge),
-                         "8jKS'y:G*Co,Wxa-")
+                         six.b("8jKS'y:G*Co,Wxa-"))
 
     def test_make_hybi00(self):
         """
