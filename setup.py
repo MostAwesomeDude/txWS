@@ -5,7 +5,7 @@ from setuptools import setup
 setup(
     name="txWS",
     py_modules=["txws"],
-    setup_requires=["vcversioner"],
+    setup_requires=["vcversioner", "six"],
     vcversioner={},
     author="Corbin Simpson",
     author_email="simpsoco@osuosl.org",
