@@ -25,6 +25,10 @@ protocols.
 
 __version__ = "0.7.1"
 
+import six
+
+import array
+
 from base64 import b64encode, b64decode
 from hashlib import md5, sha1
 from string import digits
@@ -133,7 +137,11 @@ def complete_hybi00(headers, challenge):
     first = int("".join(i for i in key1 if i in digits)) / key1.count(" ")
     second = int("".join(i for i in key2 if i in digits)) / key2.count(" ")
 
-    nonce = pack(">II8s", first, second, challenge)
+    # In python3, division of ints doesn't return an int, so we have to...
+    first = int(first)
+    second = int(second)
+
+    nonce = pack(">II8s", first, second, six.b(challenge))
 
     return md5(nonce).digest()
 
@@ -146,7 +154,10 @@ def make_accept(key):
 
     guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-    return sha1("%s%s" % (key, guid)).digest().encode("base64").strip()
+    accept = "%s%s" % (key, guid)
+    hashed_bytes = sha1(accept.encode('utf-8')).digest()
+
+    return b64encode(hashed_bytes).strip().decode('utf-8')
 
 # Frame helpers.
 # Separated out to make unit testing a lot easier.
@@ -160,7 +171,10 @@ def make_hybi00_frame(buf):
     and valid text without any 0xff bytes.
     """
 
-    return "\x00%s\xff" % buf
+    if isinstance(buf, six.text_type):
+        buf = buf.encode('utf-8')
+
+    return six.b("\x00") + buf + six.b("\xff")
 
 def parse_hybi00_frames(buf):
     """
@@ -170,12 +184,12 @@ def parse_hybi00_frames(buf):
     and will actively ignore it.
     """
 
-    start = buf.find("\x00")
+    start = buf.find(six.b("\x00"))
     tail = 0
     frames = []
 
     while start != -1:
-        end = buf.find("\xff", start + 1)
+        end = buf.find(six.b("\xff"), start + 1)
         if end == -1:
             # Incomplete frame, try again later.
             break
@@ -184,7 +198,7 @@ def parse_hybi00_frames(buf):
             frame = buf[start + 1:end]
             frames.append((NORMAL, frame))
             tail = end + 1
-        start = buf.find("\x00", end + 1)
+        start = buf.find(six.b("\x00"), end + 1)
 
     # Adjust the buffer and return.
     buf = buf[tail:]
@@ -197,12 +211,12 @@ def mask(buf, key):
     The key must be exactly four bytes long.
     """
 
-    # This is super-secure, I promise~
-    key = [ord(i) for i in key]
-    buf = list(buf)
-    for i, char in enumerate(buf):
-        buf[i] = chr(ord(char) ^ key[i % 4])
-    return "".join(buf)
+    # This is super-duper-secure, I promise~
+    key = array.array("B", key)
+    buf = array.array("B", buf)
+    for i in range(len(buf)):
+        buf[i] ^= key[i % 4]
+    return buf.tostring()
 
 def make_hybi07_frame(buf, opcode=0x1):
     """
@@ -219,20 +233,22 @@ def make_hybi07_frame(buf, opcode=0x1):
     else:
         length = chr(len(buf))
 
+    if isinstance(buf, six.text_type):
+        buf = buf.encode('utf-8')
+
     # Always make a normal packet.
     header = chr(0x80 | opcode)
-    frame = "%s%s%s" % (header, length, buf)
-    return frame
+    return six.b(header + length) + buf
 
 def make_hybi07_frame_dwim(buf):
     """
     Make a HyBi-07 frame with binary or text data according to the type of buf.
     """
-    
+
     # TODO: eliminate magic numbers.
-    if isinstance(buf, str):
+    if isinstance(buf, six.binary_type):
         return make_hybi07_frame(buf, opcode=0x2)
-    elif isinstance(buf, unicode):
+    elif isinstance(buf, six.text_type):
         return make_hybi07_frame(buf.encode("utf-8"), opcode=0x1)
     else:
         raise TypeError("In binary support mode, frame data must be either str or unicode")
@@ -252,7 +268,11 @@ def parse_hybi07_frames(buf):
 
         # Grab the header. This single byte holds some flags nobody cares
         # about, and an opcode which nobody cares about.
-        header = ord(buf[start])
+        header = buf[start]
+
+        if six.PY2:
+            header = ord(header)
+
         if header & 0x70:
             # At least one of the reserved flags is set. Pork chop sandwiches!
             raise WSException("Reserved flag in HyBi-07 frame (%d)" % header)
@@ -269,7 +289,11 @@ def parse_hybi07_frames(buf):
 
         # Get the payload length and determine whether we need to look for an
         # extra length.
-        length = ord(buf[start + 1])
+        length = buf[start + 1]
+
+        if six.PY2:
+            length = ord(length)
+
         masked = length & 0x80
         length &= 0x7f
 
@@ -320,7 +344,7 @@ def parse_hybi07_frames(buf):
                 data = unpack(">H", data[:2])[0], data[2:]
             else:
                 # No reason given; use generic data.
-                data = 1000, "No reason given"
+                data = 1000, six.b("No reason given")
 
         frames.append((opcode, data))
         start += offset + length
@@ -333,7 +357,7 @@ class WebSocketProtocol(ProtocolWrapper):
     layer.
     """
 
-    buf = ""
+    buf = six.b("")
     codec = None
     location = "/"
     host = "example.com"
@@ -349,7 +373,7 @@ class WebSocketProtocol(ProtocolWrapper):
     def setBinaryMode(self, mode):
         """
         If True, send str as binary and unicode as text.
-        
+
         Defaults to false for backwards compatibility.
         """
         self.do_binary_frames = bool(mode)
@@ -362,6 +386,14 @@ class WebSocketProtocol(ProtocolWrapper):
 
         return ISSLTransport(self.transport, None) is not None
 
+    def writeEncoded(self, data):
+        if isinstance(data, six.text_type):
+            data = data.encode('utf-8')
+        self.transport.write(data)
+
+    def writeEncodedSequence(self, sequence):
+        self.transport.writeSequence([ele.encode('utf-8') for ele in sequence])
+
     def sendCommonPreamble(self):
         """
         Send the preamble common to all WebSockets connections.
@@ -369,7 +401,7 @@ class WebSocketProtocol(ProtocolWrapper):
         This might go away in the future if WebSockets continue to diverge.
         """
 
-        self.transport.writeSequence([
+        self.writeEncodedSequence([
             "HTTP/1.1 101 FYI I am not a webserver\r\n",
             "Server: TwistedWebSocketWrapper/1.0\r\n",
             "Date: %s\r\n" % datetimeToString(),
@@ -386,7 +418,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
         self.sendCommonPreamble()
 
-        self.transport.writeSequence([
+        self.writeEncodedSequence([
             "Sec-WebSocket-Origin: %s\r\n" % self.origin,
             "Sec-WebSocket-Location: %s://%s%s\r\n" % (protocol, self.host,
                                                        self.location),
@@ -404,7 +436,7 @@ class WebSocketProtocol(ProtocolWrapper):
         challenge = self.headers["Sec-WebSocket-Key"]
         response = make_accept(challenge)
 
-        self.transport.write("Sec-WebSocket-Accept: %s\r\n\r\n" % response)
+        self.writeEncoded("Sec-WebSocket-Accept: %s\r\n\r\n" % response)
 
     def parseFrames(self):
         """
@@ -420,7 +452,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
         try:
             frames, self.buf = parser(self.buf)
-        except WSException, wse:
+        except WSException as wse:
             # Couldn't parse all the frames, something went wrong, let's bail.
             self.close(wse.args[0])
             return
@@ -464,7 +496,7 @@ class WebSocketProtocol(ProtocolWrapper):
             if self.codec:
                 frame = encoders[self.codec](frame)
             packet = maker(frame)
-            self.transport.write(packet)
+            self.writeEncoded(packet)
         self.pending_frames = []
 
     def validateHeaders(self):
@@ -494,7 +526,7 @@ class WebSocketProtocol(ProtocolWrapper):
         elif "Sec-WebSocket-Protocol" in self.headers:
             protocols = self.headers["Sec-WebSocket-Protocol"]
 
-        if isinstance(protocols, basestring):
+        if isinstance(protocols, six.string_types):
             protocols = [p.strip() for p in protocols.split(',')]
 
             for protocol in protocols:
@@ -553,8 +585,11 @@ class WebSocketProtocol(ProtocolWrapper):
             # These lines look like:
             # GET /some/path/to/a/websocket/resource HTTP/1.1
             if self.state == REQUEST:
-                if "\r\n" in self.buf:
-                    request, chaff, self.buf = self.buf.partition("\r\n")
+                separator = six.b("\r\n")
+                if separator in self.buf:
+                    request, chaff, self.buf = self.buf.partition(separator)
+                    request = request.decode('utf-8')
+
                     try:
                         verb, self.location, version = request.split(" ")
                     except ValueError:
@@ -564,8 +599,11 @@ class WebSocketProtocol(ProtocolWrapper):
 
             elif self.state == NEGOTIATING:
                 # Check to see if we've got a complete set of headers yet.
-                if "\r\n\r\n" in self.buf:
-                    head, chaff, self.buf = self.buf.partition("\r\n\r\n")
+                separator = six.b("\r\n\r\n")
+                if separator in self.buf:
+                    head, chaff, self.buf = self.buf.partition(separator)
+                    head = head.decode('utf-8')
+
                     self.headers = http_headers(head)
                     # Validate headers. This will cause a state change.
                     if not self.validateHeaders():
@@ -576,9 +614,11 @@ class WebSocketProtocol(ProtocolWrapper):
                 # HyBi-00/Hixie-76.
                 if len(self.buf) >= 8:
                     challenge, self.buf = self.buf[:8], self.buf[8:]
+                    challenge = challenge.decode('utf-8')
+
                     response = complete_hybi00(self.headers, challenge)
                     self.sendHyBi00Preamble()
-                    self.transport.write(response)
+                    self.writeEncoded(response)
                     log.msg("Completed HyBi-00/Hixie-76 handshake")
                     # We're all finished here; start sending frames.
                     self.state = FRAMES
@@ -630,7 +670,7 @@ class WebSocketProtocol(ProtocolWrapper):
         # from hanging.)
         if self.flavor in (HYBI07, HYBI10, RFC6455):
             frame = make_hybi07_frame(reason, opcode=0x8)
-            self.transport.write(frame)
+            self.writeEncoded(frame)
 
         self.loseConnection()
 
