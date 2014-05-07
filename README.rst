@@ -99,3 +99,9 @@ License
 
 txWS is (c) 2011 Oregon State University Open Source Lab and is made available
 under the MIT license.
+
+Thanks
+======
+
+Thank you to all of the contributors in the community who have chipped in to
+help keep txWS alive.
