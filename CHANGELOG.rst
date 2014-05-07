@@ -1,3 +1,9 @@
+0.9
+===
+
+* HyBi-07 updates for Chrome and Fx (#18)
+* Python 3 forward-compatibility improvements (#23)
+
 0.8
 ===
 
