@@ -23,6 +23,8 @@ Blind reimplementation of WebSockets as a standalone wrapper for Twisted
 protocols.
 """
 
+from __future__ import division
+
 __version__ = "0.7.1"
 
 import six
@@ -134,12 +136,8 @@ def complete_hybi00(headers, challenge):
     key1 = headers["Sec-WebSocket-Key1"]
     key2 = headers["Sec-WebSocket-Key2"]
 
-    first = int("".join(i for i in key1 if i in digits)) / key1.count(" ")
-    second = int("".join(i for i in key2 if i in digits)) / key2.count(" ")
-
-    # In python3, division of ints doesn't return an int, so we have to...
-    first = int(first)
-    second = int(second)
+    first = int("".join(i for i in key1 if i in digits)) // key1.count(" ")
+    second = int("".join(i for i in key2 if i in digits)) // key2.count(" ")
 
     nonce = pack(">II8s", first, second, six.b(challenge))
 
