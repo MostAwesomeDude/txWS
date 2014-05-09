@@ -435,7 +435,7 @@ class WebSocketProtocol(ProtocolWrapper):
         self.sendCommonPreamble()
 
         if self.codec:
-            self.transport.write("Sec-WebSocket-Protocol: %s\r\n" % self.codec)
+            self.writeEncoded("Sec-WebSocket-Protocol: %s\r\n" % self.codec)
 
         challenge = self.headers["Sec-WebSocket-Key"]
         response = make_accept(challenge)
