@@ -97,8 +97,8 @@ versions.
 License
 =======
 
-txWS is (c) 2011 Oregon State University Open Source Lab and is made available
-under the MIT license.
+txWS is (c) 2011 Oregon State University Open Source Lab, (c) 2014 Google
+Inc., and is made available under the Apache 2.0 license.
 
 Thanks
 ======
