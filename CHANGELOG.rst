@@ -1,3 +1,8 @@
+0.10
+===
+
+Support for HTTP upgrades within Twisted
+
 0.9
 ===
 

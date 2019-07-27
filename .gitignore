@@ -1,3 +1,7 @@
 *.pyc
 *.egg*
 _trial_temp
+version.txt
+.idea
+dist
+

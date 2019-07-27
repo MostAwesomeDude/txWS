@@ -1,9 +1,13 @@
-====
-txWS
-====
+============
+txWS Upgrade
+============
 
-txWS (pronounced "Twisted WebSockets") is a small, short, simple library for
+txWS-Upgrade (pronounced "Twisted WebSockets Upgrade") is a small, short, simple library for
 adding WebSockets server support to your favorite Twisted applications.
+
+This is forked from txWS to add upgrade support.
+https://github.com/MostAwesomeDude/txWS
+
 
 Usage
 =====
@@ -17,6 +21,76 @@ WebSockets support has never been easier.
 There is no extra trick to txWS. There is no special setup involved.
 
 Do you want secure WebSockets? Use ``listenSSL()`` instead of ``listenTCP()``.
+
+Upgrade Usage
+=============
+
+If you want to use the websocket with in an existing site, Update your code as follows.
+
+This is a vanilla Twisted website. ::
+
+
+        from twisted.web import server
+        from twisted.web.resource import Resource
+        from twisted.internet import reactor, endpoints
+
+        class Simple(Resource):
+            isLeaf = True
+            def getChild(self, name, request):
+                if name == '':
+                    return self
+                return Resource.getChild(self, name, request)
+
+            def render_GET(self, request):
+                return "Hello, world! I am located at %r." % (request.prepath,)
+
+        rootResource = Simple()
+        site = server.Site(rootResource)
+
+        endpoint = endpoints.TCP4ServerEndpoint(reactor, 8080)
+        endpoint.listen(site)
+        reactor.run()
+
+
+
+Now add the website has support for WebSockets, to include
+ the ``txws.WebSocketUpgradeResource`` and ``txws.WebSocketUpgradeHTTPChannel``. ::
+
+        from twisted.web import server
+        from twisted.web.resource import Resource
+        from twisted.internet import reactor, endpoints
+
+        class Simple(Resource):
+            isLeaf = True
+            def getChild(self, name, request):
+                if name == '':
+                    return self
+                return Resource.getChild(self, name, request)
+
+            def render_GET(self, request):
+                return "Hello, world! I am located at %r." % (request.prepath,)
+
+        rootResource = Simple()
+        site = server.Site(rootResource)
+
+        # 1) Add the imports
+        #    Create the WebSocketFactory
+        #    Create the WebSocketUpgradeResource
+        #    Put the resource into the resource tree
+        from txws import WebSocketFactory, WebSocketUpgradeResource
+        rootResource.putChild(b"websocket",
+                              WebSocketUpgradeResource(WebSocketFactory(factory_to_wrap)))
+
+
+        # 2) Add the imports
+        #    Replace protocol for the website with the Websocket upgradable ones
+        from txws import WebSocketUpgradeHTTPChannel
+        site.protocol = VortexWebsocketHTTPChannel
+
+        endpoint = endpoints.TCP4ServerEndpoint(reactor, 8080)
+        endpoint.listen(site)
+        reactor.run()
+
 
 Versions
 ========

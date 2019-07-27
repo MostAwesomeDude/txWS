@@ -16,7 +16,7 @@
 from setuptools import setup
 
 setup(
-    name="txWS",
+    name="txWS-Upgrade",
     py_modules=["txws"],
     setup_requires=["vcversioner", "six"],
     vcversioner={},
