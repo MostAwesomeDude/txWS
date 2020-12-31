@@ -15,15 +15,24 @@
 
 from setuptools import setup
 
+package_name = "txwebsocket"
+package_version = '1.0.0'
+
+requirements = ["vcversioner", "six"]
+
 setup(
-    name="txWS-Upgrade",
+    name=package_name,
     py_modules=["txws"],
-    setup_requires=["vcversioner", "six"],
+    setup_requires=requirements,
+    version=package_version,
     vcversioner={},
     author="Corbin Simpson",
     author_email="simpsoco@osuosl.org",
-    description="Twisted WebSockets wrapper",
+    description="Twisted WebSockets support with Websocket Upgrade",
     long_description=open("README.rst").read(),
     license="MIT/X11",
-    url="http://github.com/MostAwesomeDude/txWS",
+    url="https://github.com/Synerty/txwebsocket",
+    classifiers=[
+        "Programming Language :: Python :: 3.9",
+    ],
 )

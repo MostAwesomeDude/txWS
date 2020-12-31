@@ -42,7 +42,7 @@ from __future__ import division
 from twisted.web import resource, http
 from twisted.web.server import NOT_DONE_YET
 
-__version__ = "0.10.0"
+__version__ = "1.0.0"
 
 import six
 
@@ -241,7 +241,7 @@ def mask(buf, key):
     buf = array.array("B", buf)
     for i in range(len(buf)):
         buf[i] ^= key[i % 4]
-    return buf.tostring()
+    return buf.tobytes()
 
 
 def make_hybi07_frame(buf, opcode=0x1):
