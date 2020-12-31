@@ -39,7 +39,7 @@ echo "Setting version to $VER"
 sed -i "s;^package_version.*=.*;package_version = '${VER}';"  setup.py
 
 # Update the package version
-sed -i "s;.*version.*;__version__ = '${VER}';" ${PY_PACKAGE}/txws.py
+sed -i "s;.*version.*;__version__ = '${VER}';" txws.py
 
 # Reset the commit, we don't want versions in the commit
 
@@ -53,14 +53,11 @@ fi
 
 #------------------------------------------------------------------------------
 
-echo "Building sdist, Pushing to pypi index server "
-python setup.py sdist upload
+echo "Deleting old dist dir"
+[ ! -d dist ] || rm -rf dist
 
-#------------------------------------------------------------------------------
-# Copy to local release dir if it exists
-RELEASE_DIR=${RELEASE_DIR-/media/psf/release}
-if [ -d  $RELEASE_DIR ]; then
-    rm -rf $RELEASE_DIR/${PIP_PACKAGE}*.gz || true
-    cp ./dist/${PIP_PACKAGE}-$VER.tar.gz $RELEASE_DIR
-fi
+echo "Building sdist"
+python setup.py sdist
 
+echo "Pushing to pypi index server "
+twine upload dist/*
