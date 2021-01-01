@@ -13,7 +13,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 package_name = "txwebsocket"
 package_version = '1.0.1'
@@ -23,6 +23,7 @@ requirements = ["vcversioner", "six"]
 setup(
     name=package_name,
     setup_requires=requirements,
+    packages=find_packages(exclude=["test"]),
     version=package_version,
     vcversioner={},
     author="Corbin Simpson",
