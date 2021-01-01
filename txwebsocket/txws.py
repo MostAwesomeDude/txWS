@@ -42,8 +42,6 @@ from __future__ import division
 from twisted.web import resource, http
 from twisted.web.server import NOT_DONE_YET
 
-__version__ = '1.0.0'
-
 import six
 
 import array
@@ -86,7 +84,7 @@ HYBI00, HYBI07, HYBI10, RFC6455 = range(4)
 
 REQUEST, NEGOTIATING, CHALLENGE, FRAMES = range(4)
 
-__version__ = '1.0.0'
+# Control frame specifiers. Some versions of WS have control signals sent
 # in-band. Adorable, right?
 
 NORMAL, CLOSE, PING, PONG = range(4)
@@ -184,7 +182,7 @@ def make_accept(key):
 
 # Frame helpers.
 # Separated out to make unit testing a lot easier.
-__version__ = '1.0.0'
+# Frames are bonghits in newer WS versions, so helpers are appreciated.
 
 def make_hybi00_frame(buf):
     """
@@ -552,7 +550,7 @@ class WebSocketProtocol(ProtocolWrapper):
             self.origin = self.headers["Origin"]
 
         # Check whether a codec is needed. WS calls this a "protocol" for
-__version__ = '1.0.0'
+        # reasons I cannot fathom. Newer versions of noVNC (0.4+) sets
         # multiple comma-separated codecs, handle this by chosing first one
         # we can encode/decode.
         protocols = None
@@ -583,24 +581,24 @@ __version__ = '1.0.0'
 
         # Start the next phase of the handshake for HyBi-07+.
         if "Sec-WebSocket-Version" in self.headers:
-__version__ = '1.0.0'
-__version__ = '1.0.0'
+            version = self.headers["Sec-WebSocket-Version"]
+            if version == "7":
                 log.msg("Starting HyBi-07 conversation")
                 self.sendHyBi07Preamble()
                 self.flavor = HYBI07
                 self.state = FRAMES
-__version__ = '1.0.0'
+            elif version == "8":
                 log.msg("Starting HyBi-10 conversation")
                 self.sendHyBi07Preamble()
                 self.flavor = HYBI10
                 self.state = FRAMES
-__version__ = '1.0.0'
+            elif version == "13":
                 log.msg("Starting RFC 6455 conversation")
                 self.sendHyBi07Preamble()
                 self.flavor = RFC6455
                 self.state = FRAMES
             else:
-__version__ = '1.0.0'
+                log.msg("Can't support protocol version %s!" % version)
                 return False
 
         return True
@@ -624,7 +622,7 @@ __version__ = '1.0.0'
                     request = request.decode('utf-8')
 
                     try:
-__version__ = '1.0.0'
+                        verb, self.location, version = request.split(" ")
                     except ValueError:
                         self.loseConnection()
                     else:
@@ -663,7 +661,7 @@ __version__ = '1.0.0'
         , except it takes its headers from a C{twisted.web.http.Request}
 
         NOTE: txWS passes it's data to the wrapped protocol as decoded strings.
-__version__ = '1.0.0'
+        This setup method will do the conversions so that wrapped protocols won't notice
         the use of the new upgrade support.
 
         """

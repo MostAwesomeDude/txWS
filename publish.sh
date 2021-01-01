@@ -39,7 +39,7 @@ echo "Setting version to $VER"
 sed -i "s;^package_version.*=.*;package_version = '${VER}';"  setup.py
 
 # Update the package version
-sed -i "s;.*version.*;__version__ = '${VER}';" txws.py
+sed -i "s;.*version.*;__version__ = '${VER}';" ${PY_PACKAGE}/__init__.py
 
 # Reset the commit, we don't want versions in the commit
 

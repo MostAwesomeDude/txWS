@@ -22,7 +22,6 @@ requirements = ["vcversioner", "six"]
 
 setup(
     name=package_name,
-    py_modules=["txws"],
     setup_requires=requirements,
     version=package_version,
     vcversioner={},

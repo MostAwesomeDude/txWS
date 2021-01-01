@@ -12,10 +12,10 @@ https://github.com/MostAwesomeDude/txWS
 Usage
 =====
 
-Use ``txws.WebSocketFactory`` to wrap your factories. That's it! Adding
+Use ``txwebsocket.txws.WebSocketFactory`` to wrap your factories. That's it! Adding
 WebSockets support has never been easier.
 
-    >>> from txws import WebSocketFactory
+    >>> from txwebsocket.txws import WebSocketFactory
     >>> reactor.listenTCP(8080, WebSocketFactory(factory_to_wrap))
 
 There is no extra trick to txWS. There is no special setup involved.
@@ -54,7 +54,7 @@ This is a vanilla Twisted website. ::
 
 
 Now add the website has support for WebSockets, to include
- the ``txws.WebSocketUpgradeResource`` and ``txws.WebSocketUpgradeHTTPChannel``. ::
+ the ``txwebsocket.txws.WebSocketUpgradeResource`` and ``txwebsocket.txws.WebSocketUpgradeHTTPChannel``. ::
 
         from twisted.web import server
         from twisted.web.resource import Resource
@@ -77,14 +77,14 @@ Now add the website has support for WebSockets, to include
         #    Create the WebSocketFactory
         #    Create the WebSocketUpgradeResource
         #    Put the resource into the resource tree
-        from txws import WebSocketFactory, WebSocketUpgradeResource
+        from txwebsocket.txws import WebSocketFactory, WebSocketUpgradeResource
         rootResource.putChild(b"websocket",
                               WebSocketUpgradeResource(WebSocketFactory(factory_to_wrap)))
 
 
         # 2) Add the imports
         #    Replace protocol for the website with the Websocket upgradable ones
-        from txws import WebSocketUpgradeHTTPChannel
+        from txwebsocket.txws import WebSocketUpgradeHTTPChannel
         site.protocol = VortexWebsocketHTTPChannel
 
         endpoint = endpoints.TCP4ServerEndpoint(reactor, 8080)

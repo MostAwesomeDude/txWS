@@ -10,7 +10,7 @@ class EchoProtocol(Protocol):
 class EchoFactory(Factory):
     protocol = EchoProtocol
 
-from txws import WebSocketFactory
+from txwebsocket.txws import WebSocketFactory
 from twisted.application.strports import listen
 
 port = listen("tcp:5600", WebSocketFactory(EchoFactory()))
