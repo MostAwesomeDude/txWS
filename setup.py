@@ -16,7 +16,7 @@
 from setuptools import setup, find_packages
 
 package_name = "txwebsocket"
-package_version = '1.0.1'
+package_version = '1.0.2'
 
 requirements = ["vcversioner", "six"]
 
