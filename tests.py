@@ -14,9 +14,9 @@
 import six
 from twisted.trial import unittest
 
-from txws import (is_hybi00, complete_hybi00, make_hybi00_frame,
-                  parse_hybi00_frames, http_headers, make_accept, mask, CLOSE,
-                  NORMAL, PING, PONG, parse_hybi07_frames)
+from txwebsocket.txws import (is_hybi00, complete_hybi00, make_hybi00_frame,
+                                          parse_hybi00_frames, http_headers, make_accept, mask, CLOSE,
+                                          NORMAL, PING, PONG, parse_hybi07_frames)
 
 class TestHTTPHeaders(unittest.TestCase):
 

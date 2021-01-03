@@ -13,17 +13,26 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from setuptools import setup
+from setuptools import setup, find_packages
+
+package_name = "txwebsocket"
+package_version = '1.0.2'
+
+requirements = ["vcversioner", "six"]
 
 setup(
-    name="txWS",
-    py_modules=["txws"],
-    setup_requires=["vcversioner", "six"],
+    name=package_name,
+    setup_requires=requirements,
+    packages=find_packages(exclude=["test"]),
+    version=package_version,
     vcversioner={},
     author="Corbin Simpson",
     author_email="simpsoco@osuosl.org",
-    description="Twisted WebSockets wrapper",
+    description="Twisted WebSockets support with Websocket Upgrade",
     long_description=open("README.rst").read(),
     license="MIT/X11",
-    url="http://github.com/MostAwesomeDude/txWS",
+    url="https://github.com/Synerty/txwebsocket",
+    classifiers=[
+        "Programming Language :: Python :: 3.9",
+    ],
 )

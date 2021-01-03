@@ -39,7 +39,8 @@ protocols.
 
 from __future__ import division
 
-__version__ = "0.7.1"
+from twisted.web import resource, http
+from twisted.web.server import NOT_DONE_YET
 
 import six
 
@@ -55,6 +56,7 @@ from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
 from twisted.web.http import datetimeToString
 
+
 class WSException(Exception):
     """
     Something stupid happened here.
@@ -62,6 +64,7 @@ class WSException(Exception):
     If this class escapes txWS, then something stupid happened in multiple
     places.
     """
+
 
 # Flavors of WS supported here.
 # HYBI00  - Hixie-76, HyBi-00. Challenge/response after headers, very minimal
@@ -103,6 +106,7 @@ decoders = {
     "base64": b64decode,
 }
 
+
 # Fake HTTP stuff, and a couple convenience methods for examining fake HTTP
 # headers.
 
@@ -122,6 +126,7 @@ def http_headers(s):
 
     return d
 
+
 def is_websocket(headers):
     """
     Determine whether a given set of headers is asking for WebSockets.
@@ -129,6 +134,7 @@ def is_websocket(headers):
 
     return ("upgrade" in headers.get("Connection", "").lower()
             and headers.get("Upgrade").lower() == "websocket")
+
 
 def is_hybi00(headers):
     """
@@ -139,6 +145,7 @@ def is_hybi00(headers):
     """
 
     return "Sec-WebSocket-Key1" in headers and "Sec-WebSocket-Key2" in headers
+
 
 # Authentication for WS.
 
@@ -157,6 +164,7 @@ def complete_hybi00(headers, challenge):
 
     return md5(nonce).digest()
 
+
 def make_accept(key):
     """
     Create an "accept" response for a given key.
@@ -170,6 +178,7 @@ def make_accept(key):
     hashed_bytes = sha1(accept.encode('utf-8')).digest()
 
     return b64encode(hashed_bytes).strip().decode('utf-8')
+
 
 # Frame helpers.
 # Separated out to make unit testing a lot easier.
@@ -187,6 +196,7 @@ def make_hybi00_frame(buf):
         buf = buf.encode('utf-8')
 
     return six.b("\x00") + buf + six.b("\xff")
+
 
 def parse_hybi00_frames(buf):
     """
@@ -216,6 +226,7 @@ def parse_hybi00_frames(buf):
     buf = buf[tail:]
     return frames, buf
 
+
 def mask(buf, key):
     """
     Mask or unmask a buffer of bytes with a masking key.
@@ -228,7 +239,8 @@ def mask(buf, key):
     buf = array.array("B", buf)
     for i in range(len(buf)):
         buf[i] ^= key[i % 4]
-    return buf.tostring()
+    return buf.tobytes()
+
 
 def make_hybi07_frame(buf, opcode=0x1):
     """
@@ -239,18 +251,19 @@ def make_hybi07_frame(buf, opcode=0x1):
     """
 
     if len(buf) > 0xffff:
-        length = "\x7f%s" % pack(">Q", len(buf))
+        length = six.b("\x7f%s") % pack(">Q", len(buf))
     elif len(buf) > 0x7d:
-        length = "\x7e%s" % pack(">H", len(buf))
+        length = six.b("\x7e%s") % pack(">H", len(buf))
     else:
-        length = chr(len(buf))
+        length = six.b(chr(len(buf)))
 
     if isinstance(buf, six.text_type):
         buf = buf.encode('utf-8')
 
     # Always make a normal packet.
     header = chr(0x80 | opcode)
-    return six.b(header + length) + buf
+    return six.b(header) + length + buf
+
 
 def make_hybi07_frame_dwim(buf):
     """
@@ -263,7 +276,9 @@ def make_hybi07_frame_dwim(buf):
     elif isinstance(buf, six.text_type):
         return make_hybi07_frame(buf.encode("utf-8"), opcode=0x1)
     else:
-        raise TypeError("In binary support mode, frame data must be either str or unicode")
+        raise TypeError(
+            "In binary support mode, frame data must be either str or unicode")
+
 
 def parse_hybi07_frames(buf):
     """
@@ -363,6 +378,7 @@ def parse_hybi07_frames(buf):
 
     return frames, buf[start:]
 
+
 class WebSocketProtocol(ProtocolWrapper):
     """
     Protocol which wraps another protocol to provide a WebSockets transport
@@ -381,6 +397,7 @@ class WebSocketProtocol(ProtocolWrapper):
     def __init__(self, *args, **kwargs):
         ProtocolWrapper.__init__(self, *args, **kwargs)
         self.pending_frames = []
+        self.headers = {}
 
     def setBinaryMode(self, mode):
         """
@@ -586,9 +603,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
         return True
 
-    def dataReceived(self, data):
-        self.buf += data
-
+    def _initFromRawData(self):
         oldstate = None
 
         while oldstate != self.state:
@@ -639,8 +654,55 @@ class WebSocketProtocol(ProtocolWrapper):
                     # We're all finished here; start sending frames.
                     self.state = FRAMES
 
-            elif self.state == FRAMES:
-                self.parseFrames()
+    def initFromRequest(self, request):
+        """ Init from Process
+
+        Perform an alternate initialisation of the websocket, using the data from a
+        , except it takes its headers from a C{twisted.web.http.Request}
+
+        NOTE: txWS passes it's data to the wrapped protocol as decoded strings.
+        This setup method will do the conversions so that wrapped protocols won't notice
+        the use of the new upgrade support.
+
+        """
+        # Set the location from the request URI
+        self.location = request.uri.decode('utf-8')
+
+        # Parse headers from the request
+        self.headers = {}
+        for key, value in request.requestHeaders.getAllRawHeaders():
+            key = key.decode('utf-8')
+            key = key.replace('Websocket', 'WebSocket')  # ???
+            self.headers[key] = value[0].decode('utf-8')
+
+        # Set the initial state for the state machine
+        oldstate = None
+        self.state = NEGOTIATING
+
+        # Execute the state machine.
+        while oldstate != self.state:
+            oldstate = self.state
+
+            if self.state == NEGOTIATING:
+                # Validate headers. This will cause a state change.
+                if not self.validateHeaders():
+                    self.loseConnection()
+
+            elif self.state == CHALLENGE:
+                # Do nothing, the "_initFromRawData" will sort this out
+                pass
+
+        # Tick over dataReceived, it makes a compelling case for processing frames now
+        self.dataReceived(b'')
+
+    def dataReceived(self, data):
+        self.buf += data
+
+        if self.state != FRAMES:
+            self._initFromRawData()
+
+        if self.state == FRAMES:
+            self.parseFrames()
 
         # Kick any pending frames. This is needed because frames might have
         # started piling up early; we can get write()s from our protocol above
@@ -690,6 +752,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
         self.loseConnection()
 
+
 class WebSocketFactory(WrappingFactory):
     """
     Factory which wraps another factory to provide WebSockets transports for
@@ -697,3 +760,61 @@ class WebSocketFactory(WrappingFactory):
     """
 
     protocol = WebSocketProtocol
+
+
+class WebSocketUpgradeResource(resource.Resource):
+    """ Websocket Upgrade Resource
+
+    If this resource is hit, it will attempt to upgrade the connection to a websocket.
+
+    """
+    isLeaf = 1
+
+    def __init__(self, websocketFactory):
+        """ Constructor
+
+        @:param websocketFactory: A factory that will build a WebsocketProtocol (above)
+        """
+        resource.Resource.__init__(self)
+        self._websocketFactory = websocketFactory
+
+    def render(self, request):
+        websocketProtocol = self._websocketFactory.buildProtocol(request.client.host)
+        websocketProtocol.makeConnection(request.channel.transport)
+        websocketProtocol.initFromRequest(request)
+        request.channel.upgradeToWebsocket(websocketProtocol)
+
+        return NOT_DONE_YET
+
+
+class WebSocketUpgradeHTTPChannel(http.HTTPChannel):
+    """Websocket Upgrade HTTP Channel
+
+    This channel allows upgrading of websockets
+    """
+
+    _websocketProtocol = None
+
+    def upgradeToWebsocket(self, websocketProtocol):
+        """ Upgrade to Web Socket
+
+        Upgrade this channel to start using the websocket
+
+        """
+        self._websocketProtocol = websocketProtocol
+
+    def dataReceived(self, data):
+        # If we're upgraded, only send the data to the websocket
+        if self._websocketProtocol:
+            self._websocketProtocol.dataReceived(data)
+            return
+
+        # This will invoke the render method of resource provided
+        http.HTTPChannel.dataReceived(self, data)
+
+    def loseConnection(self):
+        # If we have a websocket, loose connection to both
+        if self._websocketProtocol:
+            self._websocketProtocol.loseConnection()
+
+        http.HTTPChannel.loseConnection(self)
