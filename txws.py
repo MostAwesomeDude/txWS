@@ -228,7 +228,7 @@ def mask(buf, key):
     buf = array.array("B", buf)
     for i in range(len(buf)):
         buf[i] ^= key[i % 4]
-    return buf.tostring()
+    return buf.tobytes()
 
 def make_hybi07_frame(buf, opcode=0x1):
     """
