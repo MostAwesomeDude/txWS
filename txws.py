@@ -95,12 +95,17 @@ opcode_types = {
     0xa: PONG,
 }
 
+def straight_through(data):
+    return data
+
 encoders = {
     "base64": b64encode,
+    "binary": straight_through,
 }
 
 decoders = {
     "base64": b64decode,
+    "binary": straight_through,
 }
 
 # Fake HTTP stuff, and a couple convenience methods for examining fake HTTP
@@ -555,6 +560,8 @@ class WebSocketProtocol(ProtocolWrapper):
 
             if not self.codec:
                 return False
+            elif self.codec == 'binary':
+                self.setBinaryMode(True)
 
         # Start the next phase of the handshake for HyBi-00.
         if is_hybi00(self.headers):
