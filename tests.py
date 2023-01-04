@@ -14,12 +14,23 @@
 import six
 from twisted.trial import unittest
 
-from txwebsocket.txws import (is_hybi00, complete_hybi00, make_hybi00_frame,
-                                          parse_hybi00_frames, http_headers, make_accept, mask, CLOSE,
-                                          NORMAL, PING, PONG, parse_hybi07_frames)
+from txwebsocket.txws import (
+    is_hybi00,
+    complete_hybi00,
+    make_hybi00_frame,
+    parse_hybi00_frames,
+    http_headers,
+    make_accept,
+    mask,
+    CLOSE,
+    NORMAL,
+    PING,
+    PONG,
+    parse_hybi07_frames,
+)
+
 
 class TestHTTPHeaders(unittest.TestCase):
-
     def test_single_header(self):
         raw = "Connection: Upgrade"
         headers = http_headers(raw)
@@ -46,8 +57,8 @@ class TestHTTPHeaders(unittest.TestCase):
         headers = http_headers(raw)
         self.assertEqual(headers["Origin"], "http://example.com:8080")
 
-class TestKeys(unittest.TestCase):
 
+class TestKeys(unittest.TestCase):
     def test_make_accept_rfc(self):
         """
         Test ``make_accept()`` using the keys listed in the RFC for HyBi-07
@@ -67,8 +78,8 @@ class TestKeys(unittest.TestCase):
 
         self.assertEqual(make_accept(key), "HSmrc0sMlYUkAGmm5OPpG2HaGWk=")
 
-class TestHyBi00(unittest.TestCase):
 
+class TestHyBi00(unittest.TestCase):
     def test_is_hybi00(self):
         headers = {
             "Sec-WebSocket-Key1": "hurp",
@@ -94,15 +105,18 @@ class TestHyBi00(unittest.TestCase):
         }
         challenge = "^n:ds[4U"
 
-        self.assertEqual(complete_hybi00(headers, challenge),
-                         six.b("8jKS'y:G*Co,Wxa-"))
+        self.assertEqual(
+            complete_hybi00(headers, challenge), six.b("8jKS'y:G*Co,Wxa-")
+        )
 
     def test_make_hybi00(self):
         """
         HyBi-00 frames are really, *really* simple.
         """
 
-        self.assertEqual(make_hybi00_frame("Test!"), six.b("\x00Test!\xff"))
+        self.assertEqual(
+            b"".join(make_hybi00_frame("Test!")), six.b("\x00Test!\xff")
+        )
 
     def test_parse_hybi00_single(self):
         frame = six.b("\x00Test\xff")
@@ -157,12 +171,13 @@ class TestHyBi00(unittest.TestCase):
         ]
 
         for frame in frames:
-            prepared = make_hybi00_frame(frame)
+            prepared = b"".join(make_hybi00_frame(frame))
             frames, buf = parse_hybi00_frames(prepared)
 
             self.assertEqual(len(frames), 1)
-            self.assertEqual(frames[0], (NORMAL, frame.encode('utf-8')))
+            self.assertEqual(frames[0], (NORMAL, frame.encode("utf-8")))
             self.assertEqual(buf, six.b(""))
+
 
 class TestHyBi07Helpers(unittest.TestCase):
     """

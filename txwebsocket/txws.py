@@ -184,7 +184,8 @@ def make_accept(key):
 # Separated out to make unit testing a lot easier.
 # Frames are bonghits in newer WS versions, so helpers are appreciated.
 
-def make_hybi00_frame(buf):
+
+def make_hybi00_frame(buf) -> list[bytes]:
     """
     Make a HyBi-00 frame from some data.
 
@@ -195,7 +196,7 @@ def make_hybi00_frame(buf):
     if isinstance(buf, six.text_type):
         buf = buf.encode('utf-8')
 
-    return six.b("\x00") + buf + six.b("\xff")
+    return [six.b("\x00"), buf, six.b("\xff")]
 
 
 def parse_hybi00_frames(buf):
@@ -242,7 +243,7 @@ def mask(buf, key):
     return buf.tobytes()
 
 
-def make_hybi07_frame(buf, opcode=0x1):
+def make_hybi07_frame(buf, opcode=0x1) -> list[bytes]:
     """
     Make a HyBi-07 frame.
 
@@ -262,10 +263,10 @@ def make_hybi07_frame(buf, opcode=0x1):
 
     # Always make a normal packet.
     header = chr(0x80 | opcode)
-    return six.b(header) + length + buf
+    return [six.b(header) + length, buf]
 
 
-def make_hybi07_frame_dwim(buf):
+def make_hybi07_frame_dwim(buf) -> list[bytes]:
     """
     Make a HyBi-07 frame with binary or text data according to the type of buf.
     """
@@ -367,7 +368,7 @@ def parse_hybi07_frames(buf):
 
         if opcode == CLOSE:
             if len(data) >= 2:
-                # Gotta unpack the opcode and return usable data here.
+                # We have to unpack the opcode and return usable data here.
                 data = unpack(">H", data[:2])[0], data[2:]
             else:
                 # No reason given; use generic data.
@@ -528,8 +529,8 @@ class WebSocketProtocol(ProtocolWrapper):
             # Encode the frame before sending it.
             if self.codec:
                 frame = encoders[self.codec](frame)
-            packet = maker(frame)
-            self.writeEncoded(packet)
+            packets = maker(frame)
+            self.writeEncodedSequence(packets)
         self.pending_frames = []
 
     def validateHeaders(self):
@@ -747,8 +748,8 @@ class WebSocketProtocol(ProtocolWrapper):
         # Send a closing frame. It's only polite. (And might keep the browser
         # from hanging.)
         if self.flavor in (HYBI07, HYBI10, RFC6455):
-            frame = make_hybi07_frame(reason, opcode=0x8)
-            self.writeEncoded(frame)
+            frames = make_hybi07_frame(reason, opcode=0x8)
+            self.writeEncodedSequence(frames)
 
         self.loseConnection()
 
