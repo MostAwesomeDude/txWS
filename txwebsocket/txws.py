@@ -803,6 +803,18 @@ class WebSocketUpgradeHTTPChannel(http.HTTPChannel):
         """
         self._websocketProtocol = websocketProtocol
 
+        # Clear out some data we no longer use
+
+        if hasattr(self, "dataBuffer"):
+            self.dataBuffer = []
+
+        if hasattr(self, "_dataBuffer"):
+            self._dataBuffer = []
+
+        if hasattr(self, "_tempDataBuffer"):
+            self._tempDataBuffer = []
+            self._tempDataLen = 0
+
     def dataReceived(self, data):
         # If we're upgraded, only send the data to the websocket
         if self._websocketProtocol:
