@@ -404,6 +404,7 @@ class WebSocketProtocol(ProtocolWrapper):
         ProtocolWrapper.__init__(self, *args, **kwargs)
         self.pending_frames = []
         self.headers = {}
+        self._producerForWrite = None
 
     def setBinaryMode(self, mode):
         """
@@ -412,6 +413,15 @@ class WebSocketProtocol(ProtocolWrapper):
         Defaults to false for backwards compatibility.
         """
         self.do_binary_frames = bool(mode)
+
+    def registerProducer(self, producer, streaming):
+        if hasattr(producer, "write") and hasattr(producer, "writeSequence"):
+            self._producerForWrite = producer
+        ProtocolWrapper.registerProducer(self, producer, streaming)
+
+    def unregisterProducer(self):
+        self._producerForWrite = None
+        ProtocolWrapper.unregisterProducer(self)
 
     def isSecure(self):
         """
@@ -423,11 +433,22 @@ class WebSocketProtocol(ProtocolWrapper):
 
     def writeEncoded(self, data):
         if isinstance(data, six.text_type):
-            data = data.encode('utf-8')
-        self.transport.write(data)
+            data = data.encode("utf-8")
+
+        if self._producerForWrite:
+            self._producerForWrite.write(data)
+        else:
+            self.transport.write(data)
 
     def writeEncodedSequence(self, sequence):
-        self.transport.writeSequence([ele.encode('utf-8') for ele in sequence])
+        encodedSequence = [
+            ele if isinstance(ele, bytes) else ele.encode("utf-8")
+            for ele in sequence
+        ]
+        if self._producerForWrite:
+            self._producerForWrite.writeSequence(encodedSequence)
+        else:
+            self.transport.writeSequence(encodedSequence)
 
     def sendCommonPreamble(self):
         """
