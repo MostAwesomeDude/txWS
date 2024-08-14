@@ -11,7 +11,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 # License for the specific language governing permissions and limitations under
 # the License.
-import six
+
 from twisted.trial import unittest
 
 from txws import (is_hybi00, complete_hybi00, make_hybi00_frame,
@@ -95,50 +95,50 @@ class TestHyBi00(unittest.TestCase):
         challenge = "^n:ds[4U"
 
         self.assertEqual(complete_hybi00(headers, challenge),
-                         six.b("8jKS'y:G*Co,Wxa-"))
+                         b"8jKS'y:G*Co,Wxa-")
 
     def test_make_hybi00(self):
         """
         HyBi-00 frames are really, *really* simple.
         """
 
-        self.assertEqual(make_hybi00_frame("Test!"), six.b("\x00Test!\xff"))
+        self.assertEqual(make_hybi00_frame("Test!"), b"\x00Test!\xff")
 
     def test_parse_hybi00_single(self):
-        frame = six.b("\x00Test\xff")
+        frame = b"\x00Test\xff"
 
         frames, buf = parse_hybi00_frames(frame)
 
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], (NORMAL, six.b("Test")))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (NORMAL, b"Test"))
+        self.assertEqual(buf, b"")
 
     def test_parse_hybi00_multiple(self):
-        frame = six.b("\x00Test\xff\x00Again\xff")
+        frame = b"\x00Test\xff\x00Again\xff"
 
         frames, buf = parse_hybi00_frames(frame)
 
         self.assertEqual(len(frames), 2)
-        self.assertEqual(frames[0], (NORMAL, six.b("Test")))
-        self.assertEqual(frames[1], (NORMAL, six.b("Again")))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (NORMAL, b"Test"))
+        self.assertEqual(frames[1], (NORMAL, b"Again"))
+        self.assertEqual(buf, b"")
 
     def test_parse_hybi00_incomplete(self):
-        frame = six.b("\x00Test")
+        frame = b"\x00Test"
 
         frames, buf = parse_hybi00_frames(frame)
 
         self.assertEqual(len(frames), 0)
-        self.assertEqual(buf, six.b("\x00Test"))
+        self.assertEqual(buf, b"\x00Test")
 
     def test_parse_hybi00_garbage(self):
-        frame = six.b("trash\x00Test\xff")
+        frame = b"trash\x00Test\xff"
 
         frames, buf = parse_hybi00_frames(frame)
 
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], (NORMAL, six.b("Test")))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (NORMAL, b"Test"))
+        self.assertEqual(buf, b"")
 
     def test_socketio_crashers(self):
         """
@@ -162,7 +162,7 @@ class TestHyBi00(unittest.TestCase):
 
             self.assertEqual(len(frames), 1)
             self.assertEqual(frames[0], (NORMAL, frame.encode('utf-8')))
-            self.assertEqual(buf, six.b(""))
+            self.assertEqual(buf, b"")
 
 class TestHyBi07Helpers(unittest.TestCase):
     """
@@ -172,34 +172,34 @@ class TestHyBi07Helpers(unittest.TestCase):
     """
 
     def test_mask_noop(self):
-        key = six.b("\x00\x00\x00\x00")
-        self.assertEqual(mask(six.b("Test"), key), six.b("Test"))
+        key = b"\x00\x00\x00\x00"
+        self.assertEqual(mask(b"Test", key), b"Test")
 
     def test_mask_noop_long(self):
-        key = six.b("\x00\x00\x00\x00")
-        self.assertEqual(mask(six.b("LongTest"), key), six.b("LongTest"))
+        key = b"\x00\x00\x00\x00"
+        self.assertEqual(mask(b"LongTest", key), b"LongTest")
 
     def test_parse_hybi07_unmasked_text(self):
         """
         From HyBi-10, 4.7.
         """
 
-        frame = six.b("\x81\x05Hello")
+        frame = b"\x81\x05Hello"
         frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], (NORMAL, six.b("Hello")))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (NORMAL, b"Hello"))
+        self.assertEqual(buf, b"")
 
     def test_parse_hybi07_masked_text(self):
         """
         From HyBi-10, 4.7.
         """
 
-        frame = six.b("\x81\x857\xfa!=\x7f\x9fMQX")
+        frame = b"\x81\x857\xfa!=\x7f\x9fMQX"
         frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], (NORMAL, six.b("Hello")))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (NORMAL, b"Hello"))
+        self.assertEqual(buf, b"")
 
     def test_parse_hybi07_unmasked_text_fragments(self):
         """
@@ -208,34 +208,34 @@ class TestHyBi07Helpers(unittest.TestCase):
         From HyBi-10, 4.7.
         """
 
-        frame = six.b("\x01\x03Hel\x80\x02lo")
+        frame = b"\x01\x03Hel\x80\x02lo"
         frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 2)
-        self.assertEqual(frames[0], (NORMAL, six.b("Hel")))
-        self.assertEqual(frames[1], (NORMAL, six.b("lo")))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (NORMAL, b"Hel"))
+        self.assertEqual(frames[1], (NORMAL, b"lo"))
+        self.assertEqual(buf, b"")
 
     def test_parse_hybi07_ping(self):
         """
         From HyBi-10, 4.7.
         """
 
-        frame = six.b("\x89\x05Hello")
+        frame = b"\x89\x05Hello"
         frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], (PING, six.b("Hello")))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (PING, b"Hello"))
+        self.assertEqual(buf, b"")
 
     def test_parse_hybi07_pong(self):
         """
         From HyBi-10, 4.7.
         """
 
-        frame = six.b("\x8a\x05Hello")
+        frame = b"\x8a\x05Hello"
         frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], (PONG, six.b("Hello")))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (PONG, b"Hello"))
+        self.assertEqual(buf, b"")
 
     def test_parse_hybi07_close_empty(self):
         """
@@ -243,11 +243,11 @@ class TestHyBi07Helpers(unittest.TestCase):
         the generic error code 1000, and have no reason.
         """
 
-        frame = six.b("\x88\x00")
+        frame = b"\x88\x00"
         frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], (CLOSE, (1000, six.b("No reason given"))))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (CLOSE, (1000, b"No reason given")))
+        self.assertEqual(buf, b"")
 
     def test_parse_hybi07_close_reason(self):
         """
@@ -256,38 +256,38 @@ class TestHyBi07Helpers(unittest.TestCase):
         the connection was closed.
         """
 
-        frame = six.b("\x88\x0b\x03\xe8No reason")
+        frame = b"\x88\x0b\x03\xe8No reason"
         frames, buf = parse_hybi07_frames(frame)
         self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], (CLOSE, (1000, six.b("No reason"))))
-        self.assertEqual(buf, six.b(""))
+        self.assertEqual(frames[0], (CLOSE, (1000, b"No reason")))
+        self.assertEqual(buf, b"")
 
     def test_parse_hybi07_partial_no_length(self):
-        frame = six.b("\x81")
+        frame = b"\x81"
         frames, buf = parse_hybi07_frames(frame)
         self.assertFalse(frames)
-        self.assertEqual(buf, six.b("\x81"))
+        self.assertEqual(buf, b"\x81")
 
     def test_parse_hybi07_partial_truncated_length_int(self):
-        frame = six.b("\x81\xfe")
+        frame = b"\x81\xfe"
         frames, buf = parse_hybi07_frames(frame)
         self.assertFalse(frames)
-        self.assertEqual(buf, six.b("\x81\xfe"))
+        self.assertEqual(buf, b"\x81\xfe")
 
     def test_parse_hybi07_partial_truncated_length_double(self):
-        frame = six.b("\x81\xff")
+        frame = b"\x81\xff"
         frames, buf = parse_hybi07_frames(frame)
         self.assertFalse(frames)
-        self.assertEqual(buf, six.b("\x81\xff"))
+        self.assertEqual(buf, b"\x81\xff")
 
     def test_parse_hybi07_partial_no_data(self):
-        frame = six.b("\x81\x05")
+        frame = b"\x81\x05"
         frames, buf = parse_hybi07_frames(frame)
         self.assertFalse(frames)
-        self.assertEqual(buf, six.b("\x81\x05"))
+        self.assertEqual(buf, b"\x81\x05")
 
     def test_parse_hybi07_partial_truncated_data(self):
-        frame = six.b("\x81\x05Hel")
+        frame = b"\x81\x05Hel"
         frames, buf = parse_hybi07_frames(frame)
         self.assertFalse(frames)
-        self.assertEqual(buf, six.b("\x81\x05Hel"))
+        self.assertEqual(buf, b"\x81\x05Hel")

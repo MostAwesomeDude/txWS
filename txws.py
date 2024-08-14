@@ -186,7 +186,7 @@ def make_hybi00_frame(buf):
     if isinstance(buf, six.text_type):
         buf = buf.encode('utf-8')
 
-    return six.b("\x00") + buf + six.b("\xff")
+    return b"\x00" + buf + b"\xff"
 
 def parse_hybi00_frames(buf):
     """
@@ -196,12 +196,12 @@ def parse_hybi00_frames(buf):
     and will actively ignore it.
     """
 
-    start = buf.find(six.b("\x00"))
+    start = buf.find(b"\x00")
     tail = 0
     frames = []
 
     while start != -1:
-        end = buf.find(six.b("\xff"), start + 1)
+        end = buf.find(b"\xff", start + 1)
         if end == -1:
             # Incomplete frame, try again later.
             break
@@ -210,7 +210,7 @@ def parse_hybi00_frames(buf):
             frame = buf[start + 1:end]
             frames.append((NORMAL, frame))
             tail = end + 1
-        start = buf.find(six.b("\x00"), end + 1)
+        start = buf.find(b"\x00", end + 1)
 
     # Adjust the buffer and return.
     buf = buf[tail:]
@@ -356,7 +356,7 @@ def parse_hybi07_frames(buf):
                 data = unpack(">H", data[:2])[0], data[2:]
             else:
                 # No reason given; use generic data.
-                data = 1000, six.b("No reason given")
+                data = 1000, b"No reason given"
 
         frames.append((opcode, data))
         start += offset + length
@@ -369,7 +369,7 @@ class WebSocketProtocol(ProtocolWrapper):
     layer.
     """
 
-    buf = six.b("")
+    buf = b""
     codec = None
     location = "/"
     host = "example.com"
@@ -601,7 +601,7 @@ class WebSocketProtocol(ProtocolWrapper):
             # These lines look like:
             # GET /some/path/to/a/websocket/resource HTTP/1.1
             if self.state == REQUEST:
-                separator = six.b("\r\n")
+                separator = b"\r\n"
                 if separator in self.buf:
                     request, chaff, self.buf = self.buf.partition(separator)
                     request = request.decode('utf-8')
@@ -615,7 +615,7 @@ class WebSocketProtocol(ProtocolWrapper):
 
             elif self.state == NEGOTIATING:
                 # Check to see if we've got a complete set of headers yet.
-                separator = six.b("\r\n\r\n")
+                separator = b"\r\n\r\n"
                 if separator in self.buf:
                     head, chaff, self.buf = self.buf.partition(separator)
                     head = head.decode('utf-8')
